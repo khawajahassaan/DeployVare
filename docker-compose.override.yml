@@ -1,0 +1,30 @@
+# Development overrides for docker-compose.yml
+# This file is automatically merged with docker-compose.yml when running docker-compose
+
+version: '3.8'
+
+services:
+  # Development overrides for API
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      # Mount source code for hot reload during development
+      - ./API:/src/API
+      - /src/API/bin
+      - /src/API/obj
+    # Override the build to use development mode
+    command: ["dotnet", "watch", "run", "--urls", "http://+:80"]
+
+  # Development overrides for Web
+  web:
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+    volumes:
+      # Mount source code for hot reload
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    # Override command for development
+    command: ["npm", "run", "dev"]

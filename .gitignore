@@ -1,0 +1,60 @@
+# .NET Core / .NET 8
+API/bin/
+API/obj/
+API/appsettings.Development.json
+API/appsettings.Production.json
+API/logs/
+API/publish/
+API/wwwroot/uploads/
+API/wwwroot/backups/
+*.user
+*.suo
+*.cache
+*.log
+*.tmp
+
+# Next.js
+web/.next/
+web/out/
+web/node_modules/
+web/.env.local
+web/.env.development.local
+web/.env.test.local
+web/.env.production.local
+
+# Tauri
+**/src-tauri/target/
+**/src-tauri/binaries/
+**/src-tauri/Cargo.lock
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.deb
+*.rpm
+*.AppImage
+*.dmg
+*.msi
+*.exe
+
+# Docker
+.env
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+

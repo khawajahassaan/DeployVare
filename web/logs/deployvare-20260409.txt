@@ -1,0 +1,1133 @@
+2026-04-09 01:36:02.484 +05:00 [INF] Executed DbCommand (31ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:36:02.568 +05:00 [INF] Executed DbCommand (41ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:36:02.571 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:36:02.573 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:36:02.627 +05:00 [INF] Executed DbCommand (42ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2026-04-09 01:36:02.649 +05:00 [INF] No migrations were applied. The database is already up to date.
+2026-04-09 01:36:02.650 +05:00 [INF] Database migrations applied successfully
+2026-04-09 01:36:02.654 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:36:02.672 +05:00 [INF] Executed DbCommand (15ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND NOT EXISTS (SELECT *
+         FROM [sys].[extended_properties] AS [ep]
+         WHERE [ep].[major_id] = [o].[object_id]
+             AND [ep].[minor_id] = 0
+             AND [ep].[class] = 1
+             AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+2026-04-09 01:36:02.880 +05:00 [INF] Executed DbCommand (6ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [Users] AS [u]
+        WHERE [u].[Username] = N'admin') THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+2026-04-09 01:36:02.948 +05:00 [INF] DeployVare API Started
+2026-04-09 01:36:02.956 +05:00 [INF] User profile is available. Using '/home/areeb-ahmer/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-04-09 01:36:03.002 +05:00 [INF] Now listening on: http://127.0.0.1:5233
+2026-04-09 01:36:03.004 +05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-04-09 01:36:03.005 +05:00 [INF] Hosting environment: Production
+2026-04-09 01:36:03.005 +05:00 [INF] Content root path: /usr/lib/DeployVare
+2026-04-09 01:36:08.904 +05:00 [INF] Application is shutting down...
+2026-04-09 01:45:16.086 +05:00 [INF] Executed DbCommand (29ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:16.162 +05:00 [INF] Executed DbCommand (23ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:45:16.164 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:16.166 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:45:16.182 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2026-04-09 01:45:16.205 +05:00 [INF] No migrations were applied. The database is already up to date.
+2026-04-09 01:45:16.206 +05:00 [INF] Database migrations applied successfully
+2026-04-09 01:45:16.210 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:16.214 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND NOT EXISTS (SELECT *
+         FROM [sys].[extended_properties] AS [ep]
+         WHERE [ep].[major_id] = [o].[object_id]
+             AND [ep].[minor_id] = 0
+             AND [ep].[class] = 1
+             AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+2026-04-09 01:45:16.415 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [Users] AS [u]
+        WHERE [u].[Username] = N'admin') THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+2026-04-09 01:45:16.499 +05:00 [INF] DeployVare API Started
+2026-04-09 01:45:16.508 +05:00 [INF] User profile is available. Using '/home/areeb-ahmer/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-04-09 01:45:16.550 +05:00 [INF] Now listening on: http://127.0.0.1:5233
+2026-04-09 01:45:16.552 +05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-04-09 01:45:16.553 +05:00 [INF] Hosting environment: Production
+2026-04-09 01:45:16.553 +05:00 [INF] Content root path: /usr/lib/DeployVare
+2026-04-09 01:45:19.718 +05:00 [INF] Request starting HTTP/1.1 GET http://127.0.0.1:5233/api/health - null null
+2026-04-09 01:45:19.736 +05:00 [WRN] Failed to determine the https port for redirect.
+2026-04-09 01:45:19.757 +05:00 [INF] Request finished HTTP/1.1 GET http://127.0.0.1:5233/api/health - 404 0 null 39.372ms
+2026-04-09 01:45:19.761 +05:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://127.0.0.1:5233/api/health, Response status code: 404
+2026-04-09 01:45:19.765 +05:00 [INF] Application is shutting down...
+2026-04-09 01:45:54.345 +05:00 [INF] Executed DbCommand (33ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:54.425 +05:00 [INF] Executed DbCommand (26ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:45:54.428 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:54.429 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:45:54.445 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2026-04-09 01:45:54.471 +05:00 [INF] No migrations were applied. The database is already up to date.
+2026-04-09 01:45:54.472 +05:00 [INF] Database migrations applied successfully
+2026-04-09 01:45:54.478 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:45:54.482 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND NOT EXISTS (SELECT *
+         FROM [sys].[extended_properties] AS [ep]
+         WHERE [ep].[major_id] = [o].[object_id]
+             AND [ep].[minor_id] = 0
+             AND [ep].[class] = 1
+             AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+2026-04-09 01:45:54.701 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [Users] AS [u]
+        WHERE [u].[Username] = N'admin') THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+2026-04-09 01:45:54.777 +05:00 [INF] DeployVare API Started
+2026-04-09 01:45:54.786 +05:00 [INF] User profile is available. Using '/home/areeb-ahmer/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-04-09 01:45:54.827 +05:00 [INF] Now listening on: http://127.0.0.1:5233
+2026-04-09 01:45:54.829 +05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-04-09 01:45:54.830 +05:00 [INF] Hosting environment: Production
+2026-04-09 01:45:54.830 +05:00 [INF] Content root path: /usr/lib/DeployVare
+2026-04-09 01:48:05.014 +05:00 [INF] Application is shutting down...
+2026-04-09 01:48:06.626 +05:00 [INF] Executed DbCommand (35ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:06.689 +05:00 [INF] Executed DbCommand (22ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:48:06.693 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:06.694 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:48:06.707 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2026-04-09 01:48:06.726 +05:00 [INF] No migrations were applied. The database is already up to date.
+2026-04-09 01:48:06.727 +05:00 [INF] Database migrations applied successfully
+2026-04-09 01:48:06.732 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:06.735 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND NOT EXISTS (SELECT *
+         FROM [sys].[extended_properties] AS [ep]
+         WHERE [ep].[major_id] = [o].[object_id]
+             AND [ep].[minor_id] = 0
+             AND [ep].[class] = 1
+             AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+2026-04-09 01:48:06.916 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [Users] AS [u]
+        WHERE [u].[Username] = N'admin') THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+2026-04-09 01:48:06.983 +05:00 [INF] DeployVare API Started
+2026-04-09 01:48:06.991 +05:00 [INF] User profile is available. Using '/home/areeb-ahmer/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-04-09 01:48:07.026 +05:00 [INF] Now listening on: http://127.0.0.1:5233
+2026-04-09 01:48:07.028 +05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-04-09 01:48:07.029 +05:00 [INF] Hosting environment: Production
+2026-04-09 01:48:07.029 +05:00 [INF] Content root path: /usr/lib/DeployVare
+2026-04-09 01:48:30.167 +05:00 [INF] Application is shutting down...
+2026-04-09 01:48:32.185 +05:00 [INF] Executed DbCommand (28ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:32.246 +05:00 [INF] Executed DbCommand (23ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:48:32.249 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:32.250 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2026-04-09 01:48:32.263 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2026-04-09 01:48:32.283 +05:00 [INF] No migrations were applied. The database is already up to date.
+2026-04-09 01:48:32.284 +05:00 [INF] Database migrations applied successfully
+2026-04-09 01:48:32.288 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2026-04-09 01:48:32.292 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND NOT EXISTS (SELECT *
+         FROM [sys].[extended_properties] AS [ep]
+         WHERE [ep].[major_id] = [o].[object_id]
+             AND [ep].[minor_id] = 0
+             AND [ep].[class] = 1
+             AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+2026-04-09 01:48:32.482 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [Users] AS [u]
+        WHERE [u].[Username] = N'admin') THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+2026-04-09 01:48:32.543 +05:00 [INF] DeployVare API Started
+2026-04-09 01:48:32.551 +05:00 [INF] User profile is available. Using '/home/areeb-ahmer/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-04-09 01:48:32.585 +05:00 [INF] Now listening on: http://127.0.0.1:5233
+2026-04-09 01:48:32.587 +05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-04-09 01:48:32.588 +05:00 [INF] Hosting environment: Production
+2026-04-09 01:48:32.588 +05:00 [INF] Content root path: /usr/lib/DeployVare
+2026-04-09 01:48:38.379 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - null null
+2026-04-09 01:48:38.396 +05:00 [WRN] Failed to determine the https port for redirect.
+2026-04-09 01:48:38.398 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:48:38.403 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - 204 null null 25.6974ms
+2026-04-09 01:48:38.405 +05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5233/api/auth/login - application/json 43
+2026-04-09 01:48:38.408 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:48:38.425 +05:00 [INF] Executing endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 01:48:38.446 +05:00 [INF] Route matched with {action = "Login", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Login(API.DTOs.Requests.LoginRequest) on controller API.Controllers.AuthController (API).
+2026-04-09 01:48:38.667 +05:00 [INF] Executed DbCommand (33ms) [Parameters=[@__request_Username_0='?' (Size = 100)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[CreatedAt], [t].[Email], [t].[FullName], [t].[IsActive], [t].[LastLoginAt], [t].[PasswordHash], [t].[Role], [t].[Username], [u0].[Id], [u0].[GrantedAt], [u0].[GrantedBy], [u0].[Permission], [u0].[UserId]
+FROM (
+    SELECT TOP(1) [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username]
+    FROM [Users] AS [u]
+    WHERE [u].[Username] = @__request_Username_0 AND [u].[IsActive] = CAST(1 AS bit)
+) AS [t]
+LEFT JOIN [UserPermissions] AS [u0] ON [t].[Id] = [u0].[UserId]
+ORDER BY [t].[Id]
+2026-04-09 01:48:39.046 +05:00 [INF] Executing UnauthorizedObjectResult, writing value of type '<>f__AnonymousType2`1[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 01:48:39.069 +05:00 [INF] Executed action API.Controllers.AuthController.Login (API) in 620.1972ms
+2026-04-09 01:48:39.070 +05:00 [INF] Executed endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 01:48:39.074 +05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5233/api/auth/login - 401 null application/json; charset=utf-8 668.6708ms
+2026-04-09 01:49:54.995 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - null null
+2026-04-09 01:49:54.995 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:54.996 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - 204 null null 1.0003ms
+2026-04-09 01:49:54.997 +05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5233/api/auth/login - application/json 43
+2026-04-09 01:49:54.997 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:54.998 +05:00 [INF] Executing endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 01:49:54.998 +05:00 [INF] Route matched with {action = "Login", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Login(API.DTOs.Requests.LoginRequest) on controller API.Controllers.AuthController (API).
+2026-04-09 01:49:55.055 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__request_Username_0='?' (Size = 100)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[CreatedAt], [t].[Email], [t].[FullName], [t].[IsActive], [t].[LastLoginAt], [t].[PasswordHash], [t].[Role], [t].[Username], [u0].[Id], [u0].[GrantedAt], [u0].[GrantedBy], [u0].[Permission], [u0].[UserId]
+FROM (
+    SELECT TOP(1) [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username]
+    FROM [Users] AS [u]
+    WHERE [u].[Username] = @__request_Username_0 AND [u].[IsActive] = CAST(1 AS bit)
+) AS [t]
+LEFT JOIN [UserPermissions] AS [u0] ON [t].[Id] = [u0].[UserId]
+ORDER BY [t].[Id]
+2026-04-09 01:49:55.428 +05:00 [INF] Executed DbCommand (17ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (DbType = DateTime2)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [Users] SET [LastLoginAt] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:49:55.456 +05:00 [INF] User admin logged in successfully
+2026-04-09 01:49:55.456 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.LoginResponse'.
+2026-04-09 01:49:55.467 +05:00 [INF] Executed action API.Controllers.AuthController.Login (API) in 469.0408ms
+2026-04-09 01:49:55.467 +05:00 [INF] Executed endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 01:49:55.468 +05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5233/api/auth/login - 200 null application/json; charset=utf-8 471.0901ms
+2026-04-09 01:49:55.525 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 01:49:55.526 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.526 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 0.4355ms
+2026-04-09 01:49:55.526 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 01:49:55.526 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.526 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 0.2904ms
+2026-04-09 01:49:55.528 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 01:49:55.528 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 01:49:55.528 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.528 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.529 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - 204 null null 0.2663ms
+2026-04-09 01:49:55.529 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 01:49:55.529 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.530 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 01:49:55.530 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:49:55.587 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:49:55.587 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:49:55.587 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 01:49:55.591 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 01:49:55.591 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 01:49:55.592 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 01:49:55.614 +05:00 [INF] Executed DbCommand (6ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 01:49:55.648 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:49:55.654 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 62.6117ms
+2026-04-09 01:49:55.654 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:49:55.654 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 126.0147ms
+2026-04-09 01:49:55.657 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 01:49:55.661 +05:00 [INF] Executed DbCommand (9ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 01:49:55.665 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:49:55.674 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 83.1823ms
+2026-04-09 01:49:55.675 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 01:49:55.675 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 145.9764ms
+2026-04-09 01:49:55.679 +05:00 [INF] Executed DbCommand (10ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 01:49:55.698 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 01:49:55.707 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 115.2548ms
+2026-04-09 01:49:55.707 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:49:55.707 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - 200 null application/json; charset=utf-8 177.5078ms
+2026-04-09 01:50:01.076 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 01:50:01.076 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:01.077 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 0.5264ms
+2026-04-09 01:50:01.077 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 01:50:01.077 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:01.079 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:50:01.080 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 01:50:01.082 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 01:50:01.083 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:50:01.084 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 3.9602ms
+2026-04-09 01:50:01.084 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:50:01.084 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 6.6571ms
+2026-04-09 01:50:11.708 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/users - null null
+2026-04-09 01:50:11.708 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/users/available-permissions - null null
+2026-04-09 01:50:11.708 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:11.708 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:11.709 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/users - 204 null null 0.3206ms
+2026-04-09 01:50:11.709 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/users/available-permissions - 204 null null 0.3206ms
+2026-04-09 01:50:11.710 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/users - null null
+2026-04-09 01:50:11.710 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/users/available-permissions - null null
+2026-04-09 01:50:11.710 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:11.710 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:11.712 +05:00 [INF] Executing endpoint 'API.Controllers.UsersController.GetAll (API)'
+2026-04-09 01:50:11.712 +05:00 [INF] Executing endpoint 'API.Controllers.UsersController.GetAvailablePermissions (API)'
+2026-04-09 01:50:11.714 +05:00 [INF] Route matched with {action = "GetAvailablePermissions", controller = "Users"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult GetAvailablePermissions() on controller API.Controllers.UsersController (API).
+2026-04-09 01:50:11.716 +05:00 [INF] Route matched with {action = "GetAll", controller = "Users"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.UsersController (API).
+2026-04-09 01:50:11.723 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[<>f__AnonymousType8`2[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:50:11.725 +05:00 [INF] Executed action API.Controllers.UsersController.GetAvailablePermissions (API) in 11.2977ms
+2026-04-09 01:50:11.725 +05:00 [INF] Executed endpoint 'API.Controllers.UsersController.GetAvailablePermissions (API)'
+2026-04-09 01:50:11.725 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/users/available-permissions - 200 null application/json; charset=utf-8 15.1362ms
+2026-04-09 01:50:11.732 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username], [u0].[Id], [u0].[GrantedAt], [u0].[GrantedBy], [u0].[Permission], [u0].[UserId]
+FROM [Users] AS [u]
+LEFT JOIN [UserPermissions] AS [u0] ON [u].[Id] = [u0].[UserId]
+ORDER BY [u].[Username], [u].[Id]
+2026-04-09 01:50:11.749 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.UserDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:50:11.753 +05:00 [INF] Executed action API.Controllers.UsersController.GetAll (API) in 37.4428ms
+2026-04-09 01:50:11.754 +05:00 [INF] Executed endpoint 'API.Controllers.UsersController.GetAll (API)'
+2026-04-09 01:50:11.754 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/users - 200 null application/json; charset=utf-8 43.7024ms
+2026-04-09 01:50:19.922 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=20 - null null
+2026-04-09 01:50:19.922 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:19.922 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=20 - 204 null null 0.331ms
+2026-04-09 01:50:19.923 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=20 - null null
+2026-04-09 01:50:19.923 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:50:19.923 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:50:19.923 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 01:50:19.926 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 01:50:19.928 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 01:50:19.931 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 01:50:19.932 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 8.405ms
+2026-04-09 01:50:19.932 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:50:19.932 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=20 - 200 null application/json; charset=utf-8 9.1503ms
+2026-04-09 01:53:36.023 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:53:36.023 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:53:36.024 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.8306ms
+2026-04-09 01:53:36.025 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:53:36.025 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:53:36.026 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:53:36.029 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 01:53:36.050 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 01:53:36.115 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:53:36.120 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 90.5183ms
+2026-04-09 01:53:36.120 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:53:36.120 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 95.0281ms
+2026-04-09 01:53:36.131 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 01:53:36.131 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:53:36.131 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - 204 null null 0.2404ms
+2026-04-09 01:53:36.132 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 01:53:36.132 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:53:36.133 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 01:53:36.140 +05:00 [INF] Route matched with {action = "GetDeploymentHistory", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetDeploymentHistory(Int32, Int32) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 01:53:36.181 +05:00 [INF] Executed DbCommand (14ms) [Parameters=[@__p_1='?' (DbType = Int32), @__applicationServerId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[ApplicationServerId], [t].[BackupFileName], [t].[CompletedAt], [t].[DeployedBy], [t].[DeploymentDate], [t].[DeploymentDurationSeconds], [t].[ErrorMessage], [t].[LocalBackupPath], [t].[StartedAt], [t].[Status], [t].[Version], [a0].[Id], [a0].[AppPoolName], [a0].[ApplicationId], [a0].[BackupPath], [a0].[CreatedAt], [a0].[DeploymentPath], [a0].[EncryptedPassword], [a0].[HostName], [a0].[IsActive], [a0].[Port], [a0].[ServerName], [a0].[SshPrivateKey], [a0].[UpdatedAt], [a0].[Username], [a0].[WebsiteName], [a1].[Id], [a1].[CreatedAt], [a1].[CreatedBy], [a1].[Description], [a1].[Name], [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username], [a2].[Id], [a2].[ApiDeploymentId], [a2].[FileHash], [a2].[FileName], [a2].[FileSize], [a2].[UploadedAt]
+FROM (
+    SELECT TOP(@__p_1) [a].[Id], [a].[ApplicationServerId], [a].[BackupFileName], [a].[CompletedAt], [a].[DeployedBy], [a].[DeploymentDate], [a].[DeploymentDurationSeconds], [a].[ErrorMessage], [a].[LocalBackupPath], [a].[StartedAt], [a].[Status], [a].[Version]
+    FROM [ApiDeployments] AS [a]
+    WHERE [a].[ApplicationServerId] = @__applicationServerId_0
+    ORDER BY [a].[DeploymentDate] DESC
+) AS [t]
+INNER JOIN [ApplicationServers] AS [a0] ON [t].[ApplicationServerId] = [a0].[Id]
+INNER JOIN [Applications] AS [a1] ON [a0].[ApplicationId] = [a1].[Id]
+INNER JOIN [Users] AS [u] ON [t].[DeployedBy] = [u].[Id]
+LEFT JOIN [ApiDeploymentFiles] AS [a2] ON [t].[Id] = [a2].[ApiDeploymentId]
+ORDER BY [t].[DeploymentDate] DESC, [t].[Id], [a0].[Id], [a1].[Id], [u].[Id]
+2026-04-09 01:53:36.205 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApiDeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:53:36.228 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API) in 87.4522ms
+2026-04-09 01:53:36.228 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 01:53:36.228 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - 200 null application/json; charset=utf-8 96.5438ms
+2026-04-09 01:53:38.073 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:53:38.073 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:53:38.074 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:53:38.074 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 01:53:38.075 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 01:53:38.077 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:53:38.077 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 3.1282ms
+2026-04-09 01:53:38.077 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:53:38.077 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 3.9516ms
+2026-04-09 01:54:08.282 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments - null null
+2026-04-09 01:54:08.282 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:54:08.282 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments - 204 null null 0.2837ms
+2026-04-09 01:54:08.283 +05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5233/api/apideployments - multipart/form-data; boundary=----WebKitFormBoundarydHIkHjtBws71XcTU 967
+2026-04-09 01:54:08.283 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:54:08.284 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.Deploy (API)'
+2026-04-09 01:54:08.288 +05:00 [INF] Route matched with {action = "Deploy", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Deploy(API.DTOs.Requests.DeployApiRequest) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 01:54:08.306 +05:00 [INF] Starting API deployment for server 1 by user 1
+2026-04-09 01:54:08.320 +05:00 [INF] Executed DbCommand (4ms) [Parameters=[@__request_ApplicationServerId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+WHERE [a].[Id] = @__request_ApplicationServerId_0
+2026-04-09 01:54:08.410 +05:00 [INF] Executed DbCommand (18ms) [Parameters=[@p0='?' (DbType = Int32), @p1='?' (Size = 500), @p2='?' (DbType = DateTime2), @p3='?' (DbType = Int32), @p4='?' (DbType = DateTime2), @p5='?' (DbType = Int32), @p6='?' (Size = 4000), @p7='?' (Size = 500), @p8='?' (DbType = DateTime2), @p9='?' (Size = 50), @p10='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+INSERT INTO [ApiDeployments] ([ApplicationServerId], [BackupFileName], [CompletedAt], [DeployedBy], [DeploymentDate], [DeploymentDurationSeconds], [ErrorMessage], [LocalBackupPath], [StartedAt], [Status], [Version])
+OUTPUT INSERTED.[Id]
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10);
+2026-04-09 01:54:08.425 +05:00 [INF] Starting deployment 1002 to stage server (192.227.122.100)
+2026-04-09 01:54:08.447 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p0='?' (DbType = Int32), @p1='?' (Size = 64), @p2='?' (Size = 200), @p3='?' (DbType = Int64), @p4='?' (DbType = DateTime2)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+INSERT INTO [ApiDeploymentFiles] ([ApiDeploymentId], [FileHash], [FileName], [FileSize], [UploadedAt])
+OUTPUT INSERTED.[Id]
+VALUES (@p0, @p1, @p2, @p3, @p4);
+2026-04-09 01:54:08.456 +05:00 [INF] Executed DbCommand (4ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [Status] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:08.457 +05:00 [INF] Stopping App Pool 'Test' on 192.227.122.100
+2026-04-09 01:54:08.463 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:10.599 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            Import-Module WebAdministration;
+    ...
+2026-04-09 01:54:15.738 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:15.739 +05:00 [INF] App Pool stopped: App Pool stopped successfully
+
+2026-04-09 01:54:15.740 +05:00 [INF] Stopping Website 'Test' on 192.227.122.100
+2026-04-09 01:54:15.741 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:17.877 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            Import-Module WebAdministration;
+    ...
+2026-04-09 01:54:21.350 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:21.350 +05:00 [INF] Website stopped: Website stopped successfully
+
+2026-04-09 01:54:21.354 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [Status] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:21.355 +05:00 [INF] Creating backup of C:\inetpub\wwwroot\Test on 192.227.122.100
+2026-04-09 01:54:21.356 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:23.501 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            $ProgressPreference = 'SilentlyContin...
+2026-04-09 01:54:26.638 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:26.638 +05:00 [INF] Backup result: SUCCESS: Backup created: Test_20260409_015421.zip ({0:N2} MB)
+-f
+2.22286510467529
+
+2026-04-09 01:54:26.643 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 500)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [BackupFileName] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:26.646 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [Status] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:28.831 +05:00 [INF] Uploading 1 files to 192.227.122.100
+2026-04-09 01:54:28.831 +05:00 [INF] Uploading tsconfig.json...
+2026-04-09 01:54:30.981 +05:00 [INF] Successfully uploaded all 1 files
+2026-04-09 01:54:30.985 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [Status] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:30.986 +05:00 [INF] Starting Website 'Test' on 192.227.122.100
+2026-04-09 01:54:30.987 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:33.135 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            Import-Module WebAdministration;
+    ...
+2026-04-09 01:54:36.627 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:36.627 +05:00 [INF] Website started: Website started successfully
+
+2026-04-09 01:54:36.629 +05:00 [INF] Starting App Pool 'Test' on 192.227.122.100
+2026-04-09 01:54:36.630 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:38.861 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            Import-Module WebAdministration;
+    ...
+2026-04-09 01:54:43.374 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:43.374 +05:00 [INF] App Pool started: App Pool started successfully
+
+2026-04-09 01:54:43.379 +05:00 [INF] Executed DbCommand (4ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [Status] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:54:45.381 +05:00 [INF] Verifying deployment on 192.227.122.100
+2026-04-09 01:54:45.382 +05:00 [INF] Using password authentication for 192.227.122.100:22
+2026-04-09 01:54:47.463 +05:00 [INF] Executing PowerShell command on 192.227.122.100: 
+            Import-Module WebAdministration;
+    ...
+2026-04-09 01:54:48.923 +05:00 [INF] Command completed with exit code: 0
+2026-04-09 01:54:48.923 +05:00 [INF] Deployment verification successful
+2026-04-09 01:54:48.930 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p3='?' (DbType = Int32), @p0='?' (DbType = DateTime2), @p1='?' (DbType = Int32), @p2='?' (Size = 50)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [CompletedAt] = @p0, [DeploymentDurationSeconds] = @p1, [Status] = @p2
+OUTPUT 1
+WHERE [Id] = @p3;
+2026-04-09 01:54:48.934 +05:00 [INF] Deployment 1002 completed successfully
+2026-04-09 01:54:48.935 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.ApiDeploymentResultDto'.
+2026-04-09 01:54:48.938 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.Deploy (API) in 40649.2924ms
+2026-04-09 01:54:48.938 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.Deploy (API)'
+2026-04-09 01:54:48.938 +05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5233/api/apideployments - 200 null application/json; charset=utf-8 40655.5216ms
+2026-04-09 01:55:22.214 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:55:22.214 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:22.214 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.3589ms
+2026-04-09 01:55:22.215 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:55:22.215 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:22.216 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:55:22.216 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 01:55:22.221 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 01:55:22.222 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:55:22.223 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 6.8387ms
+2026-04-09 01:55:22.223 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:55:22.223 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 7.7728ms
+2026-04-09 01:55:22.233 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 01:55:22.233 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:22.233 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - 204 null null 0.2521ms
+2026-04-09 01:55:22.234 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 01:55:22.234 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:22.234 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 01:55:22.234 +05:00 [INF] Route matched with {action = "GetDeploymentHistory", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetDeploymentHistory(Int32, Int32) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 01:55:22.242 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[@__p_1='?' (DbType = Int32), @__applicationServerId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[ApplicationServerId], [t].[BackupFileName], [t].[CompletedAt], [t].[DeployedBy], [t].[DeploymentDate], [t].[DeploymentDurationSeconds], [t].[ErrorMessage], [t].[LocalBackupPath], [t].[StartedAt], [t].[Status], [t].[Version], [a0].[Id], [a0].[AppPoolName], [a0].[ApplicationId], [a0].[BackupPath], [a0].[CreatedAt], [a0].[DeploymentPath], [a0].[EncryptedPassword], [a0].[HostName], [a0].[IsActive], [a0].[Port], [a0].[ServerName], [a0].[SshPrivateKey], [a0].[UpdatedAt], [a0].[Username], [a0].[WebsiteName], [a1].[Id], [a1].[CreatedAt], [a1].[CreatedBy], [a1].[Description], [a1].[Name], [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username], [a2].[Id], [a2].[ApiDeploymentId], [a2].[FileHash], [a2].[FileName], [a2].[FileSize], [a2].[UploadedAt]
+FROM (
+    SELECT TOP(@__p_1) [a].[Id], [a].[ApplicationServerId], [a].[BackupFileName], [a].[CompletedAt], [a].[DeployedBy], [a].[DeploymentDate], [a].[DeploymentDurationSeconds], [a].[ErrorMessage], [a].[LocalBackupPath], [a].[StartedAt], [a].[Status], [a].[Version]
+    FROM [ApiDeployments] AS [a]
+    WHERE [a].[ApplicationServerId] = @__applicationServerId_0
+    ORDER BY [a].[DeploymentDate] DESC
+) AS [t]
+INNER JOIN [ApplicationServers] AS [a0] ON [t].[ApplicationServerId] = [a0].[Id]
+INNER JOIN [Applications] AS [a1] ON [a0].[ApplicationId] = [a1].[Id]
+INNER JOIN [Users] AS [u] ON [t].[DeployedBy] = [u].[Id]
+LEFT JOIN [ApiDeploymentFiles] AS [a2] ON [t].[Id] = [a2].[ApiDeploymentId]
+ORDER BY [t].[DeploymentDate] DESC, [t].[Id], [a0].[Id], [a1].[Id], [u].[Id]
+2026-04-09 01:55:22.248 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApiDeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:55:22.252 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API) in 17.2643ms
+2026-04-09 01:55:22.252 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 01:55:22.252 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - 200 null application/json; charset=utf-8 18.4254ms
+2026-04-09 01:55:27.521 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/1002/backup - null null
+2026-04-09 01:55:27.522 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:27.522 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/1002/backup - 204 null null 0.23ms
+2026-04-09 01:55:27.522 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/apideployments/1002/backup - null null
+2026-04-09 01:55:27.523 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:27.523 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.DownloadBackup (API)'
+2026-04-09 01:55:27.525 +05:00 [INF] Route matched with {action = "DownloadBackup", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] DownloadBackup(Int32) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 01:55:27.536 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[@__deploymentId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [a].[Id], [a].[ApplicationServerId], [a].[BackupFileName], [a].[CompletedAt], [a].[DeployedBy], [a].[DeploymentDate], [a].[DeploymentDurationSeconds], [a].[ErrorMessage], [a].[LocalBackupPath], [a].[StartedAt], [a].[Status], [a].[Version], [a0].[Id], [a0].[AppPoolName], [a0].[ApplicationId], [a0].[BackupPath], [a0].[CreatedAt], [a0].[DeploymentPath], [a0].[EncryptedPassword], [a0].[HostName], [a0].[IsActive], [a0].[Port], [a0].[ServerName], [a0].[SshPrivateKey], [a0].[UpdatedAt], [a0].[Username], [a0].[WebsiteName]
+FROM [ApiDeployments] AS [a]
+INNER JOIN [ApplicationServers] AS [a0] ON [a].[ApplicationServerId] = [a0].[Id]
+WHERE [a].[Id] = @__deploymentId_0
+2026-04-09 01:55:29.578 +05:00 [INF] Downloading C:\DeployVare\Backups\Test_20260409_015421.zip from 192.227.122.100 to wwwroot/backups/1002/Test_20260409_015421.zip
+2026-04-09 01:55:57.542 +05:00 [INF] Successfully downloaded C:\DeployVare\Backups\Test_20260409_015421.zip
+2026-04-09 01:55:57.549 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (Size = 500)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [ApiDeployments] SET [LocalBackupPath] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 01:55:57.553 +05:00 [INF] Executing FileContentResult, sending file with download name 'Test_20260409_015421.zip' ...
+2026-04-09 01:55:57.565 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.DownloadBackup (API) in 30039.4047ms
+2026-04-09 01:55:57.565 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.DownloadBackup (API)'
+2026-04-09 01:55:57.566 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/apideployments/1002/backup - 200 2330843 application/zip 30042.9367ms
+2026-04-09 01:55:58.074 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/8/backup - null null
+2026-04-09 01:55:58.075 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:58.075 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/8/backup - 204 null null 0.2487ms
+2026-04-09 01:55:58.075 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/apideployments/8/backup - null null
+2026-04-09 01:55:58.076 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:55:58.076 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.DownloadBackup (API)'
+2026-04-09 01:55:58.076 +05:00 [INF] Route matched with {action = "DownloadBackup", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] DownloadBackup(Int32) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 01:55:58.077 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__deploymentId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [a].[Id], [a].[ApplicationServerId], [a].[BackupFileName], [a].[CompletedAt], [a].[DeployedBy], [a].[DeploymentDate], [a].[DeploymentDurationSeconds], [a].[ErrorMessage], [a].[LocalBackupPath], [a].[StartedAt], [a].[Status], [a].[Version], [a0].[Id], [a0].[AppPoolName], [a0].[ApplicationId], [a0].[BackupPath], [a0].[CreatedAt], [a0].[DeploymentPath], [a0].[EncryptedPassword], [a0].[HostName], [a0].[IsActive], [a0].[Port], [a0].[ServerName], [a0].[SshPrivateKey], [a0].[UpdatedAt], [a0].[Username], [a0].[WebsiteName]
+FROM [ApiDeployments] AS [a]
+INNER JOIN [ApplicationServers] AS [a0] ON [a].[ApplicationServerId] = [a0].[Id]
+WHERE [a].[Id] = @__deploymentId_0
+2026-04-09 01:56:00.523 +05:00 [INF] Downloading C:\DeployVare\Backups\Test_20251119_122907.zip from 192.227.122.100 to wwwroot/backups/8/Test_20251119_122907.zip
+2026-04-09 01:56:22.576 +05:00 [INF] Successfully downloaded C:\DeployVare\Backups\Test_20251119_122907.zip
+2026-04-09 01:56:22.577 +05:00 [INF] Executing FileContentResult, sending file with download name 'Test_20251119_122907.zip' ...
+2026-04-09 01:56:22.580 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.DownloadBackup (API) in 24503.6861ms
+2026-04-09 01:56:22.580 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.DownloadBackup (API)'
+2026-04-09 01:56:22.580 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/apideployments/8/backup - 200 2330843 application/zip 24504.4023ms
+2026-04-09 01:56:23.177 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 01:56:23.177 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 01:56:23.177 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.177 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - 204 null null 0.3555ms
+2026-04-09 01:56:23.178 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.178 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 0.9049ms
+2026-04-09 01:56:23.177 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 01:56:23.178 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.178 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 0.9925ms
+2026-04-09 01:56:23.181 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 01:56:23.181 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.181 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:56:23.182 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 01:56:23.181 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 01:56:23.184 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.184 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:56:23.184 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 01:56:23.181 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 01:56:23.185 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:56:23.186 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 01:56:23.186 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 01:56:23.193 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 01:56:23.194 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:56:23.194 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 8.1317ms
+2026-04-09 01:56:23.194 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 01:56:23.195 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 13.6226ms
+2026-04-09 01:56:23.450 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 01:56:23.450 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 01:56:23.451 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:56:23.451 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 266.4442ms
+2026-04-09 01:56:23.451 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 01:56:23.451 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 270.0007ms
+2026-04-09 01:56:23.452 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 01:56:23.453 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 01:56:23.453 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 271.513ms
+2026-04-09 01:56:23.453 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 01:56:23.453 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - 200 null application/json; charset=utf-8 272.5741ms
+2026-04-09 01:57:08.295 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:57:08.296 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:57:08.296 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.4301ms
+2026-04-09 01:57:08.298 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 01:57:08.298 +05:00 [INF] CORS policy execution successful.
+2026-04-09 01:57:08.299 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:57:08.299 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 01:57:08.302 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 01:57:08.305 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 01:57:08.305 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 5.8775ms
+2026-04-09 01:57:08.305 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 01:57:08.305 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 7.4505ms
+2026-04-09 02:08:19.709 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 02:08:19.710 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.711 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 1.341ms
+2026-04-09 02:08:19.711 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 02:08:19.711 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.711 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 0.0984ms
+2026-04-09 02:08:19.711 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 02:08:19.711 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.711 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - 204 null null 0.0807ms
+2026-04-09 02:08:19.715 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 02:08:19.715 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.715 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 02:08:19.715 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 02:08:19.717 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 02:08:19.717 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.717 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 02:08:19.717 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 02:08:19.721 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 02:08:19.721 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:19.722 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 02:08:19.723 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 02:08:20.009 +05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 02:08:20.009 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 02:08:20.009 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 294.1613ms
+2026-04-09 02:08:20.010 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 02:08:20.010 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 294.9234ms
+2026-04-09 02:08:20.061 +05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 02:08:20.061 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 02:08:20.061 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 02:08:20.062 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 344.2133ms
+2026-04-09 02:08:20.062 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 02:08:20.062 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 344.9899ms
+2026-04-09 02:08:20.063 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 02:08:20.063 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 02:08:20.063 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 339.7318ms
+2026-04-09 02:08:20.063 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 02:08:20.063 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - 200 null application/json; charset=utf-8 342.4011ms
+2026-04-09 02:08:25.557 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 02:08:25.557 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:25.558 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 0.2212ms
+2026-04-09 02:08:25.558 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 02:08:25.558 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:25.559 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 02:08:25.559 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 02:08:25.563 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 02:08:25.564 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 02:08:25.564 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 4.89ms
+2026-04-09 02:08:25.564 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 02:08:25.565 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 6.5262ms
+2026-04-09 02:08:31.905 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/compare - null null
+2026-04-09 02:08:31.905 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:31.906 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/compare - 204 null null 0.9036ms
+2026-04-09 02:08:31.907 +05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5233/api/schemacomparison/compare - application/json 49
+2026-04-09 02:08:31.909 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:31.909 +05:00 [INF] Executing endpoint 'API.Controllers.SchemaComparisonController.Compare (API)'
+2026-04-09 02:08:31.917 +05:00 [INF] Route matched with {action = "Compare", controller = "SchemaComparison"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Compare(API.DTOs.Requests.CompareSchemaRequest) on controller API.Controllers.SchemaComparisonController (API).
+2026-04-09 02:08:31.928 +05:00 [INF] Comparing schemas: Source=2002, Target=2003
+2026-04-09 02:08:31.940 +05:00 [INF] Executed DbCommand (4ms) [Parameters=[@__sourceInstanceId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+WHERE [d].[Id] = @__sourceInstanceId_0
+2026-04-09 02:08:31.950 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[@__targetInstanceId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+WHERE [d].[Id] = @__targetInstanceId_0
+2026-04-09 02:08:31.950 +05:00 [INF] Decrypting connection strings...
+2026-04-09 02:08:31.950 +05:00 [INF] Fetching source tables...
+2026-04-09 02:08:32.310 +05:00 [INF] Found 158 source tables
+2026-04-09 02:08:32.310 +05:00 [INF] Fetching target tables...
+2026-04-09 02:08:32.419 +05:00 [INF] Found 158 target tables
+2026-04-09 02:08:32.419 +05:00 [INF] Fetching source procedures...
+2026-04-09 02:08:32.567 +05:00 [INF] Found 860 source procedures
+2026-04-09 02:08:32.567 +05:00 [INF] Fetching target procedures...
+2026-04-09 02:08:32.618 +05:00 [INF] Found 860 target procedures
+2026-04-09 02:08:32.619 +05:00 [INF] Fetching source functions...
+2026-04-09 02:08:32.636 +05:00 [INF] Found 4 source functions
+2026-04-09 02:08:32.637 +05:00 [INF] Fetching target functions...
+2026-04-09 02:08:32.652 +05:00 [INF] Found 4 target functions
+2026-04-09 02:08:32.652 +05:00 [INF] Comparing tables...
+2026-04-09 02:08:32.657 +05:00 [INF] Table comparison complete: 158 differences
+2026-04-09 02:08:32.657 +05:00 [INF] Comparing procedures...
+2026-04-09 02:08:32.659 +05:00 [INF] Comparing 860 source procedures with 860 target procedures...
+2026-04-09 02:08:32.659 +05:00 [INF] Found 0 added procedures
+2026-04-09 02:08:32.659 +05:00 [INF] Found 0 removed procedures
+2026-04-09 02:08:32.659 +05:00 [INF] Checking for modified procedures (using hash comparison for speed)...
+2026-04-09 02:08:32.660 +05:00 [INF] First procedure hash comparison complete: dbo.AcademicRisk_Control_Insert
+2026-04-09 02:08:32.661 +05:00 [INF] Processed 100/860 procedures (99 identical, 0 modified)...
+2026-04-09 02:08:32.662 +05:00 [INF] Processed 200/860 procedures (198 identical, 1 modified)...
+2026-04-09 02:08:32.663 +05:00 [INF] Processed 300/860 procedures (298 identical, 1 modified)...
+2026-04-09 02:08:32.665 +05:00 [INF] Processed 400/860 procedures (397 identical, 2 modified)...
+2026-04-09 02:08:32.666 +05:00 [INF] Processed 500/860 procedures (497 identical, 2 modified)...
+2026-04-09 02:08:32.667 +05:00 [INF] Processed 600/860 procedures (597 identical, 2 modified)...
+2026-04-09 02:08:32.669 +05:00 [INF] Processed 700/860 procedures (696 identical, 3 modified)...
+2026-04-09 02:08:32.670 +05:00 [INF] Processed 800/860 procedures (796 identical, 3 modified)...
+2026-04-09 02:08:32.671 +05:00 [INF] Procedure comparison complete: 857 identical, 3 modified (detailed diff for first 0)
+2026-04-09 02:08:32.671 +05:00 [INF] Procedure comparison complete: 3 differences
+2026-04-09 02:08:32.671 +05:00 [INF] Comparing functions...
+2026-04-09 02:08:32.672 +05:00 [INF] Comparing 4 source functions with 4 target functions...
+2026-04-09 02:08:32.672 +05:00 [INF] Function comparison complete: 4 identical, 0 modified
+2026-04-09 02:08:32.672 +05:00 [INF] Function comparison complete: 0 differences
+2026-04-09 02:08:32.673 +05:00 [INF] Schema comparison completed successfully
+2026-04-09 02:08:32.673 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.SchemaComparisonDto'.
+2026-04-09 02:08:32.679 +05:00 [INF] Executed action API.Controllers.SchemaComparisonController.Compare (API) in 761.8208ms
+2026-04-09 02:08:32.679 +05:00 [INF] Executed endpoint 'API.Controllers.SchemaComparisonController.Compare (API)'
+2026-04-09 02:08:32.679 +05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5233/api/schemacomparison/compare - 200 null application/json; charset=utf-8 772.023ms
+2026-04-09 02:08:37.040 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=DraftKRI_GetByRiskRegisterId&schema=dbo - null null
+2026-04-09 02:08:37.040 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:37.040 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=DraftKRI_GetByRiskRegisterId&schema=dbo - 204 null null 0.1825ms
+2026-04-09 02:08:37.041 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=DraftKRI_GetByRiskRegisterId&schema=dbo - null null
+2026-04-09 02:08:37.041 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:37.041 +05:00 [INF] Executing endpoint 'API.Controllers.SchemaComparisonController.GetProcedureDetail (API)'
+2026-04-09 02:08:37.044 +05:00 [INF] Route matched with {action = "GetProcedureDetail", controller = "SchemaComparison"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetProcedureDetail(Int32, Int32, System.String, System.String) on controller API.Controllers.SchemaComparisonController (API).
+2026-04-09 02:08:37.048 +05:00 [INF] Getting procedure detail: dbo.DraftKRI_GetByRiskRegisterId
+2026-04-09 02:08:37.063 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [DatabaseInstances] AS [d]
+WHERE [d].[Id] = @__p_0
+2026-04-09 02:08:37.065 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [DatabaseInstances] AS [d]
+WHERE [d].[Id] = @__p_0
+2026-04-09 02:08:37.110 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.ProcedureDetailDto'.
+2026-04-09 02:08:37.112 +05:00 [INF] Executed action API.Controllers.SchemaComparisonController.GetProcedureDetail (API) in 68.0147ms
+2026-04-09 02:08:37.112 +05:00 [INF] Executed endpoint 'API.Controllers.SchemaComparisonController.GetProcedureDetail (API)'
+2026-04-09 02:08:37.112 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=DraftKRI_GetByRiskRegisterId&schema=dbo - 200 null application/json; charset=utf-8 71.6841ms
+2026-04-09 02:08:49.290 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=GetAllKRI&schema=dbo - null null
+2026-04-09 02:08:49.290 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:49.291 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=GetAllKRI&schema=dbo - 204 null null 0.3235ms
+2026-04-09 02:08:49.295 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=GetAllKRI&schema=dbo - null null
+2026-04-09 02:08:49.295 +05:00 [INF] CORS policy execution successful.
+2026-04-09 02:08:49.295 +05:00 [INF] Executing endpoint 'API.Controllers.SchemaComparisonController.GetProcedureDetail (API)'
+2026-04-09 02:08:49.295 +05:00 [INF] Route matched with {action = "GetProcedureDetail", controller = "SchemaComparison"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetProcedureDetail(Int32, Int32, System.String, System.String) on controller API.Controllers.SchemaComparisonController (API).
+2026-04-09 02:08:49.297 +05:00 [INF] Getting procedure detail: dbo.GetAllKRI
+2026-04-09 02:08:49.299 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [DatabaseInstances] AS [d]
+WHERE [d].[Id] = @__p_0
+2026-04-09 02:08:49.300 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [DatabaseInstances] AS [d]
+WHERE [d].[Id] = @__p_0
+2026-04-09 02:08:49.304 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.ProcedureDetailDto'.
+2026-04-09 02:08:49.304 +05:00 [INF] Executed action API.Controllers.SchemaComparisonController.GetProcedureDetail (API) in 8.674ms
+2026-04-09 02:08:49.304 +05:00 [INF] Executed endpoint 'API.Controllers.SchemaComparisonController.GetProcedureDetail (API)'
+2026-04-09 02:08:49.304 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/schemacomparison/procedure-detail?sourceInstanceId=2002&targetInstanceId=2003&procedureName=GetAllKRI&schema=dbo - 200 null application/json; charset=utf-8 9.7699ms
+2026-04-09 09:20:27.022 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 09:20:27.023 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 09:20:27.023 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 09:20:27.041 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.041 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.041 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.041 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 19.4596ms
+2026-04-09 09:20:27.041 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 18.8667ms
+2026-04-09 09:20:27.041 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - 204 null null 18.5232ms
+2026-04-09 09:20:27.044 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 09:20:27.044 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.045 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 09:20:27.045 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 09:20:27.047 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 09:20:27.047 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 09:20:27.047 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.047 +05:00 [INF] CORS policy execution successful.
+2026-04-09 09:20:27.047 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 09:20:27.047 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 09:20:27.047 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 09:20:27.048 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 09:20:27.844 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 09:20:27.846 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 09:20:27.847 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 799.1043ms
+2026-04-09 09:20:27.847 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 09:20:27.847 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 800.1449ms
+2026-04-09 09:20:27.852 +05:00 [INF] Executed DbCommand (148ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 09:20:27.852 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 09:20:27.853 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 807.8137ms
+2026-04-09 09:20:27.853 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 09:20:27.853 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 809.0694ms
+2026-04-09 09:20:27.938 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 09:20:27.940 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 09:20:27.940 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 09:20:27.941 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 893.1461ms
+2026-04-09 09:20:27.941 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 09:20:27.941 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - 200 null application/json; charset=utf-8 894.3405ms
+2026-04-09 11:36:37.755 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:36:37.755 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:37.755 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.2699ms
+2026-04-09 11:36:37.755 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:36:37.756 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:37.757 +05:00 [INF] Failed to validate the token.
+Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException: IDX10223: Lifetime validation failed. The token is expired. ValidTo (UTC): '4/9/2026 4:49:55 AM', Current time (UTC): '4/9/2026 6:36:37 AM'.
+   at Microsoft.IdentityModel.Tokens.ValidatorUtilities.ValidateLifetime(Nullable`1 notBefore, Nullable`1 expires, SecurityToken securityToken, TokenValidationParameters validationParameters)
+   at Microsoft.IdentityModel.Tokens.Validators.ValidateLifetime(Nullable`1 notBefore, Nullable`1 expires, SecurityToken securityToken, TokenValidationParameters validationParameters)
+   at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateTokenPayloadAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+   at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateJWSAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+2026-04-09 11:36:37.767 +05:00 [INF] Bearer was not authenticated. Failure message: IDX10223: Lifetime validation failed. The token is expired. ValidTo (UTC): '4/9/2026 4:49:55 AM', Current time (UTC): '4/9/2026 6:36:37 AM'.
+2026-04-09 11:36:37.768 +05:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2026-04-09 11:36:37.772 +05:00 [INF] AuthenticationScheme: Bearer was challenged.
+2026-04-09 11:36:37.772 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 401 0 null 16.939ms
+2026-04-09 11:36:55.178 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - null null
+2026-04-09 11:36:55.178 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.178 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/auth/login - 204 null null 0.1646ms
+2026-04-09 11:36:55.179 +05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5233/api/auth/login - application/json 43
+2026-04-09 11:36:55.179 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.179 +05:00 [INF] Executing endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 11:36:55.179 +05:00 [INF] Route matched with {action = "Login", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Login(API.DTOs.Requests.LoginRequest) on controller API.Controllers.AuthController (API).
+2026-04-09 11:36:55.362 +05:00 [INF] Executed DbCommand (4ms) [Parameters=[@__request_Username_0='?' (Size = 100)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[CreatedAt], [t].[Email], [t].[FullName], [t].[IsActive], [t].[LastLoginAt], [t].[PasswordHash], [t].[Role], [t].[Username], [u0].[Id], [u0].[GrantedAt], [u0].[GrantedBy], [u0].[Permission], [u0].[UserId]
+FROM (
+    SELECT TOP(1) [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username]
+    FROM [Users] AS [u]
+    WHERE [u].[Username] = @__request_Username_0 AND [u].[IsActive] = CAST(1 AS bit)
+) AS [t]
+LEFT JOIN [UserPermissions] AS [u0] ON [t].[Id] = [u0].[UserId]
+ORDER BY [t].[Id]
+2026-04-09 11:36:55.524 +05:00 [INF] Executed DbCommand (3ms) [Parameters=[@p1='?' (DbType = Int32), @p0='?' (DbType = DateTime2)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+UPDATE [Users] SET [LastLoginAt] = @p0
+OUTPUT 1
+WHERE [Id] = @p1;
+2026-04-09 11:36:55.524 +05:00 [INF] User admin logged in successfully
+2026-04-09 11:36:55.525 +05:00 [INF] Executing OkObjectResult, writing value of type 'API.DTOs.Responses.LoginResponse'.
+2026-04-09 11:36:55.525 +05:00 [INF] Executed action API.Controllers.AuthController.Login (API) in 345.3406ms
+2026-04-09 11:36:55.525 +05:00 [INF] Executed endpoint 'API.Controllers.AuthController.Login (API)'
+2026-04-09 11:36:55.525 +05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5233/api/auth/login - 200 null application/json; charset=utf-8 345.8657ms
+2026-04-09 11:36:55.551 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applications - null null
+2026-04-09 11:36:55.551 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.551 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applications - 204 null null 0.1692ms
+2026-04-09 11:36:55.552 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - null null
+2026-04-09 11:36:55.552 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.552 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/databaseinstances - 204 null null 0.1107ms
+2026-04-09 11:36:55.552 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applications - null null
+2026-04-09 11:36:55.552 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.553 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 11:36:55.553 +05:00 [INF] Route matched with {action = "GetAll", controller = "Applications"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationsController (API).
+2026-04-09 11:36:55.553 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/databaseinstances - null null
+2026-04-09 11:36:55.553 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 11:36:55.554 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.554 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.554 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/deployments?page=1&pageSize=5 - 204 null null 0.1256ms
+2026-04-09 11:36:55.554 +05:00 [INF] Executing endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 11:36:55.554 +05:00 [INF] Route matched with {action = "GetAll", controller = "DatabaseInstances"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.DatabaseInstancesController (API).
+2026-04-09 11:36:55.555 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - null null
+2026-04-09 11:36:55.555 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:55.555 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name], [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy]
+FROM [Applications] AS [a]
+LEFT JOIN [DatabaseInstances] AS [d] ON [a].[Id] = [d].[ApplicationId]
+ORDER BY [a].[Name], [a].[Id]
+2026-04-09 11:36:55.555 +05:00 [INF] Executing endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 11:36:55.555 +05:00 [INF] Route matched with {action = "GetAll", controller = "Deployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll(Int32, Int32) on controller API.Controllers.DeploymentsController (API).
+2026-04-09 11:36:55.556 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 11:36:55.556 +05:00 [INF] Executed action API.Controllers.ApplicationsController.GetAll (API) in 3.0938ms
+2026-04-09 11:36:55.556 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationsController.GetAll (API)'
+2026-04-09 11:36:55.556 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applications - 200 null application/json; charset=utf-8 3.8034ms
+2026-04-09 11:36:55.557 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM [Deployments] AS [d]
+2026-04-09 11:36:55.560 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[@__p_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[BackupFilePath], [t].[DatabaseInstanceId], [t].[DeployedAt], [t].[DeployedBy], [t].[DurationSeconds], [t].[ErrorMessage], [t].[FromPatchNumber], [t].[Status], [t].[ToPatchNumber], [d0].[Id], [d0].[ApplicationId], [d0].[ConnectionStringEncrypted], [d0].[CreatedAt], [d0].[CreatedBy], [d0].[CurrentPatchNumber], [d0].[InstanceName], [d0].[IsActive], [d0].[UpdatedAt], [d0].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM (
+    SELECT [d].[Id], [d].[BackupFilePath], [d].[DatabaseInstanceId], [d].[DeployedAt], [d].[DeployedBy], [d].[DurationSeconds], [d].[ErrorMessage], [d].[FromPatchNumber], [d].[Status], [d].[ToPatchNumber]
+    FROM [Deployments] AS [d]
+    ORDER BY [d].[DeployedAt] DESC
+    OFFSET @__p_0 ROWS FETCH NEXT @__p_1 ROWS ONLY
+) AS [t]
+INNER JOIN [DatabaseInstances] AS [d0] ON [t].[DatabaseInstanceId] = [d0].[Id]
+INNER JOIN [Applications] AS [a] ON [d0].[ApplicationId] = [a].[Id]
+ORDER BY [t].[DeployedAt] DESC
+2026-04-09 11:36:55.561 +05:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType6`5[[System.Collections.Generic.List`1[[API.DTOs.Responses.DeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-04-09 11:36:55.561 +05:00 [INF] Executed action API.Controllers.DeploymentsController.GetAll (API) in 5.3086ms
+2026-04-09 11:36:55.561 +05:00 [INF] Executed endpoint 'API.Controllers.DeploymentsController.GetAll (API)'
+2026-04-09 11:36:55.561 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/deployments?page=1&pageSize=5 - 200 null application/json; charset=utf-8 6.1032ms
+2026-04-09 11:36:55.611 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [d].[Id], [d].[ApplicationId], [d].[ConnectionStringEncrypted], [d].[CreatedAt], [d].[CreatedBy], [d].[CurrentPatchNumber], [d].[InstanceName], [d].[IsActive], [d].[UpdatedAt], [d].[UpdatedBy], [a].[Id], [a].[CreatedAt], [a].[CreatedBy], [a].[Description], [a].[Name]
+FROM [DatabaseInstances] AS [d]
+INNER JOIN [Applications] AS [a] ON [d].[ApplicationId] = [a].[Id]
+ORDER BY [a].[Name], [d].[InstanceName]
+2026-04-09 11:36:55.613 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.DatabaseInstanceDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 11:36:55.613 +05:00 [INF] Executed action API.Controllers.DatabaseInstancesController.GetAll (API) in 58.8851ms
+2026-04-09 11:36:55.613 +05:00 [INF] Executed endpoint 'API.Controllers.DatabaseInstancesController.GetAll (API)'
+2026-04-09 11:36:55.613 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/databaseinstances - 200 null application/json; charset=utf-8 59.6242ms
+2026-04-09 11:36:57.079 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:36:57.079 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:57.079 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.1481ms
+2026-04-09 11:36:57.080 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:36:57.080 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:36:57.080 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 11:36:57.081 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 11:36:57.083 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 11:36:57.084 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 11:36:57.084 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 3.8083ms
+2026-04-09 11:36:57.084 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 11:36:57.084 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 4.8402ms
+2026-04-09 11:37:02.763 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:37:02.763 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:37:02.763 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/applicationservers - 204 null null 0.1085ms
+2026-04-09 11:37:02.763 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/applicationservers - null null
+2026-04-09 11:37:02.763 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:37:02.764 +05:00 [INF] Executing endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 11:37:02.764 +05:00 [INF] Route matched with {action = "GetAll", controller = "ApplicationServers"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetAll() on controller API.Controllers.ApplicationServersController (API).
+2026-04-09 11:37:02.766 +05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [a].[Id], [a].[AppPoolName], [a].[ApplicationId], [a].[BackupPath], [a].[CreatedAt], [a].[DeploymentPath], [a].[EncryptedPassword], [a].[HostName], [a].[IsActive], [a].[Port], [a].[ServerName], [a].[SshPrivateKey], [a].[UpdatedAt], [a].[Username], [a].[WebsiteName], [a0].[Id], [a0].[CreatedAt], [a0].[CreatedBy], [a0].[Description], [a0].[Name], [a1].[Id], [a1].[ApplicationServerId], [a1].[BackupFileName], [a1].[CompletedAt], [a1].[DeployedBy], [a1].[DeploymentDate], [a1].[DeploymentDurationSeconds], [a1].[ErrorMessage], [a1].[LocalBackupPath], [a1].[StartedAt], [a1].[Status], [a1].[Version]
+FROM [ApplicationServers] AS [a]
+INNER JOIN [Applications] AS [a0] ON [a].[ApplicationId] = [a0].[Id]
+LEFT JOIN [ApiDeployments] AS [a1] ON [a].[Id] = [a1].[ApplicationServerId]
+ORDER BY [a0].[Name], [a].[ServerName], [a].[Id], [a0].[Id]
+2026-04-09 11:37:02.767 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApplicationServerDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 11:37:02.767 +05:00 [INF] Executed action API.Controllers.ApplicationServersController.GetAll (API) in 2.857ms
+2026-04-09 11:37:02.767 +05:00 [INF] Executed endpoint 'API.Controllers.ApplicationServersController.GetAll (API)'
+2026-04-09 11:37:02.767 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/applicationservers - 200 null application/json; charset=utf-8 3.817ms
+2026-04-09 11:37:02.773 +05:00 [INF] Request starting HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 11:37:02.773 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:37:02.773 +05:00 [INF] Request finished HTTP/1.1 OPTIONS http://localhost:5233/api/apideployments/server/1?limit=50 - 204 null null 0.1526ms
+2026-04-09 11:37:02.774 +05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - null null
+2026-04-09 11:37:02.774 +05:00 [INF] CORS policy execution successful.
+2026-04-09 11:37:02.774 +05:00 [INF] Executing endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 11:37:02.774 +05:00 [INF] Route matched with {action = "GetDeploymentHistory", controller = "ApiDeployments"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetDeploymentHistory(Int32, Int32) on controller API.Controllers.ApiDeploymentsController (API).
+2026-04-09 11:37:02.777 +05:00 [INF] Executed DbCommand (2ms) [Parameters=[@__p_1='?' (DbType = Int32), @__applicationServerId_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT [t].[Id], [t].[ApplicationServerId], [t].[BackupFileName], [t].[CompletedAt], [t].[DeployedBy], [t].[DeploymentDate], [t].[DeploymentDurationSeconds], [t].[ErrorMessage], [t].[LocalBackupPath], [t].[StartedAt], [t].[Status], [t].[Version], [a0].[Id], [a0].[AppPoolName], [a0].[ApplicationId], [a0].[BackupPath], [a0].[CreatedAt], [a0].[DeploymentPath], [a0].[EncryptedPassword], [a0].[HostName], [a0].[IsActive], [a0].[Port], [a0].[ServerName], [a0].[SshPrivateKey], [a0].[UpdatedAt], [a0].[Username], [a0].[WebsiteName], [a1].[Id], [a1].[CreatedAt], [a1].[CreatedBy], [a1].[Description], [a1].[Name], [u].[Id], [u].[CreatedAt], [u].[Email], [u].[FullName], [u].[IsActive], [u].[LastLoginAt], [u].[PasswordHash], [u].[Role], [u].[Username], [a2].[Id], [a2].[ApiDeploymentId], [a2].[FileHash], [a2].[FileName], [a2].[FileSize], [a2].[UploadedAt]
+FROM (
+    SELECT TOP(@__p_1) [a].[Id], [a].[ApplicationServerId], [a].[BackupFileName], [a].[CompletedAt], [a].[DeployedBy], [a].[DeploymentDate], [a].[DeploymentDurationSeconds], [a].[ErrorMessage], [a].[LocalBackupPath], [a].[StartedAt], [a].[Status], [a].[Version]
+    FROM [ApiDeployments] AS [a]
+    WHERE [a].[ApplicationServerId] = @__applicationServerId_0
+    ORDER BY [a].[DeploymentDate] DESC
+) AS [t]
+INNER JOIN [ApplicationServers] AS [a0] ON [t].[ApplicationServerId] = [a0].[Id]
+INNER JOIN [Applications] AS [a1] ON [a0].[ApplicationId] = [a1].[Id]
+INNER JOIN [Users] AS [u] ON [t].[DeployedBy] = [u].[Id]
+LEFT JOIN [ApiDeploymentFiles] AS [a2] ON [t].[Id] = [a2].[ApiDeploymentId]
+ORDER BY [t].[DeploymentDate] DESC, [t].[Id], [a0].[Id], [a1].[Id], [u].[Id]
+2026-04-09 11:37:02.782 +05:00 [INF] Executing OkObjectResult, writing value of type 'System.Collections.Generic.List`1[[API.DTOs.Responses.ApiDeploymentDto, API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-04-09 11:37:02.784 +05:00 [INF] Executed action API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API) in 10.3804ms
+2026-04-09 11:37:02.785 +05:00 [INF] Executed endpoint 'API.Controllers.ApiDeploymentsController.GetDeploymentHistory (API)'
+2026-04-09 11:37:02.785 +05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5233/api/apideployments/server/1?limit=50 - 200 null application/json; charset=utf-8 10.9122ms

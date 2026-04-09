@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # .NET API Backend
+  api:
+    build:
+      context: .
+      dockerfile: Docker/api/Dockerfile
+    container_name: deployvare-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DeployVareDb=Server=db,1433;User ID=sa;Password=YourStrong!Passw0rd;Database=DeployVare;Integrated Security=False;MultipleActiveResultSets=true;TrustServerCertificate=True
+      - JwtSettings__SecretKey=YourSuperSecretKeyThatIsAtLeast32CharactersLongForHS256!
+      - JwtSettings__Issuer=DeployVareAPI
+      - JwtSettings__Audience=DeployVareClient
+      - JwtSettings__ExpirationMinutes=480
+      - EncryptionSettings__EncryptionKey=32CharacterLongEncryptionKey12
+      - FileUploadSettings__MaxFileSizeMB=50
+      - FileUploadSettings__UploadPath=wwwroot/uploads
+      - FileUploadSettings__BackupPath=wwwroot/backups
+    ports:
+      - "8080:80"
+    volumes:
+      - api_uploads:/app/wwwroot/uploads
+      - api_backups:/app/wwwroot/backups
+      - api_logs:/app/logs
+    networks:
+      - deployvare-network
+    restart: unless-stopped
+
+  # Next.js Frontend
+  web:
+    build:
+      context: .
+      dockerfile: Docker/web/Dockerfile
+    container_name: deployvare-web
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - deployvare-network
+    restart: unless-stopped
+
+volumes:
+  api_uploads:
+  api_backups:
+  api_logs:
+
+networks:
+  deployvare-network:
+    driver: bridge

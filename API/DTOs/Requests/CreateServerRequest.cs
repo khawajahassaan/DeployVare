@@ -1,0 +1,48 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace API.DTOs.Requests;
+
+public class CreateServerRequest
+{
+    [Required]
+    public int ApplicationId { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    public string ServerName { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string HostName { get; set; } = string.Empty;
+
+    public int Port { get; set; } = 22;
+
+    [Required]
+    [MaxLength(100)]
+    public string Username { get; set; } = string.Empty;
+
+    [MaxLength(500)]
+    public string? Password { get; set; }
+
+    public string? SshPrivateKey { get; set; }
+
+    [Required]
+    [MaxLength(500)]
+    public string DeploymentPath { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string AppPoolName { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string WebsiteName { get; set; } = string.Empty;
+
+    [MaxLength(500)]
+    public string BackupPath { get; set; } = @"C:\DeployVare\Backups";
+}
+
+
+
+
+

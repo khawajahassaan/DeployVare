@@ -1,0 +1,18 @@
+[package]
+name = "deployvare"
+version = "1.0.0"
+edition = "2021"
+description = "DeployVare SQL Deployment Manager"
+
+[lib]
+name = "deployvare_lib"
+crate-type = ["lib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
