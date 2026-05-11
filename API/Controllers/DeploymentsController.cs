@@ -18,18 +18,21 @@ public class DeploymentsController : ControllerBase
     private readonly DeployVareDbContext _context;
     private readonly ILogger<DeploymentsController> _logger;
     private readonly string _uploadPath;
+    private readonly IFileStorageService _storage;
 
     public DeploymentsController(
         IDeploymentService deploymentService,
         IBackupService backupService,
         DeployVareDbContext context,
         IConfiguration configuration,
-        ILogger<DeploymentsController> logger)
+        ILogger<DeploymentsController> logger,
+        IFileStorageService storage)
     {
         _deploymentService = deploymentService;
         _backupService = backupService;
         _context = context;
         _logger = logger;
+        _storage = storage;
         
         var uploadPathConfig = configuration["FileUploadSettings:UploadPath"] ?? "wwwroot/uploads";
         _uploadPath = Path.Combine(Directory.GetCurrentDirectory(), uploadPathConfig);
@@ -258,12 +261,21 @@ public class DeploymentsController : ControllerBase
             if (deployment == null)
                 return NotFound(new { message = $"Deployment with ID {id} not found" });
 
-            if (string.IsNullOrEmpty(deployment.BackupFilePath) || !System.IO.File.Exists(deployment.BackupFilePath))
+            if (string.IsNullOrEmpty(deployment.BackupFilePath))
                 return NotFound(new { message = "Backup file not found" });
 
-            var fileBytes = await System.IO.File.ReadAllBytesAsync(deployment.BackupFilePath);
             var fileName = Path.GetFileName(deployment.BackupFilePath);
 
+            if (_storage.IsCloud)
+            {
+                var stream = await _storage.DownloadAsync(deployment.BackupFilePath);
+                return File(stream, "application/zip", fileName);
+            }
+
+            if (!System.IO.File.Exists(deployment.BackupFilePath))
+                return NotFound(new { message = "Backup file not found on disk" });
+
+            var fileBytes = await System.IO.File.ReadAllBytesAsync(deployment.BackupFilePath);
             return File(fileBytes, "application/zip", fileName);
         }
         catch (Exception ex)

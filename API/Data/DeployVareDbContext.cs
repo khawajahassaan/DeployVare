@@ -29,6 +29,10 @@ public class DeployVareDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Use the correct SQL function for the active database provider
+        var isSqlite = Database.IsSqlite();
+        var nowSql = isSqlite ? "datetime('now')" : "GETUTCDATE()";
+
         // User Configuration
         modelBuilder.Entity<User>(entity =>
         {
@@ -42,7 +46,7 @@ public class DeployVareDbContext : DbContext
                 .IsRequired()
                 .HasConversion<string>()
                 .HasMaxLength(50);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
         });
 
         // UserPermission Configuration
@@ -54,7 +58,7 @@ public class DeployVareDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(50);
             entity.Property(e => e.GrantedBy).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.GrantedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.GrantedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.UserPermissions)
@@ -74,7 +78,7 @@ public class DeployVareDbContext : DbContext
             entity.HasIndex(e => e.Name).IsUnique();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
         });
 
         // DatabaseInstance Configuration
@@ -86,7 +90,7 @@ public class DeployVareDbContext : DbContext
             entity.Property(e => e.CurrentPatchNumber).HasDefaultValue(0);
             entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
             
             entity.HasIndex(e => new { e.ApplicationId, e.InstanceName })
                 .IsUnique()
@@ -108,7 +112,7 @@ public class DeployVareDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20);
             entity.Property(e => e.BackupFilePath).HasMaxLength(500);
-            entity.Property(e => e.DeployedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.DeployedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.DatabaseInstance)
                 .WithMany(d => d.Deployments)
@@ -127,7 +131,7 @@ public class DeployVareDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Author).HasMaxLength(100);
             entity.Property(e => e.Status).IsRequired().HasMaxLength(20);
-            entity.Property(e => e.ExecutedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.ExecutedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.Deployment)
                 .WithMany(d => d.DeploymentPatches)
@@ -143,7 +147,7 @@ public class DeployVareDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.ObjectType).IsRequired().HasMaxLength(50);
             entity.Property(e => e.ObjectName).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.ExecutedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.ExecutedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.Deployment)
                 .WithMany(d => d.DeploymentObjects)
@@ -161,7 +165,7 @@ public class DeployVareDbContext : DbContext
             entity.Property(e => e.Action).IsRequired().HasMaxLength(100);
             entity.Property(e => e.EntityType).HasMaxLength(50);
             entity.Property(e => e.IpAddress).HasMaxLength(50);
-            entity.Property(e => e.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.Timestamp).HasDefaultValueSql(nowSql);
 
             entity.HasIndex(e => e.Timestamp).IsDescending();
         });
@@ -185,7 +189,7 @@ public class DeployVareDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .HasDefaultValueSql("'Api'");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.Application)
                 .WithMany()
@@ -213,7 +217,7 @@ public class DeployVareDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .HasDefaultValueSql("'Api'");
-            entity.Property(e => e.DeploymentDate).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.DeploymentDate).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.ApplicationServer)
                 .WithMany(s => s.ApiDeployments)
@@ -235,7 +239,7 @@ public class DeployVareDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.FileName).IsRequired().HasMaxLength(200);
             entity.Property(e => e.FileHash).HasMaxLength(64);
-            entity.Property(e => e.UploadedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.UploadedAt).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.ApiDeployment)
                 .WithMany(d => d.DeploymentFiles)

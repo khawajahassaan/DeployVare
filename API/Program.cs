@@ -65,9 +65,20 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Configure Database
+// Configure Database – read DB_PROVIDER env var set by the Tauri sidecar launcher.
+// "sqlite"    → SQLite file stored next to the app (default / local mode)
+// "sqlserver" → SQL Server (cloud / enterprise mode, requires a connection string)
+var dbProvider = (Environment.GetEnvironmentVariable("DB_PROVIDER") ?? "sqlite").ToLowerInvariant();
+var dbConnStr = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+                ?? builder.Configuration.GetConnectionString("DeployVareDb")!;
+
 builder.Services.AddDbContext<DeployVareDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DeployVareDb")));
+{
+    if (dbProvider == "sqlserver")
+        options.UseSqlServer(dbConnStr);
+    else
+        options.UseSqlite(dbConnStr);
+});
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -137,6 +148,25 @@ builder.Services.AddScoped<API.Services.Interfaces.IIisManagementService, API.Se
 builder.Services.AddScoped<API.Services.Interfaces.IApiDeploymentService, API.Services.Implementations.ApiDeploymentService>();
 builder.Services.AddScoped<API.Services.Interfaces.IApplicationServerService, API.Services.Implementations.ApplicationServerService>();
 
+// File storage – local by default; switch to B2 when the env var is set by the Tauri sidecar launcher
+var b2Enabled = string.Equals(Environment.GetEnvironmentVariable("B2_ENABLED"), "true", StringComparison.OrdinalIgnoreCase);
+if (b2Enabled)
+{
+    builder.Services.AddSingleton<API.Services.Interfaces.IFileStorageService>(_ =>
+        new API.Services.Implementations.B2FileStorageService(
+            Environment.GetEnvironmentVariable("B2_KEY_ID")!,
+            Environment.GetEnvironmentVariable("B2_APP_KEY")!,
+            Environment.GetEnvironmentVariable("B2_BUCKET")!,
+            Environment.GetEnvironmentVariable("B2_ENDPOINT")!,
+            Environment.GetEnvironmentVariable("B2_REGION")!
+        ));
+}
+else
+{
+    builder.Services.AddSingleton<API.Services.Interfaces.IFileStorageService,
+        API.Services.Implementations.LocalFileStorageService>();
+}
+
 var app = builder.Build();
 
 // Seed database with admin user
@@ -145,9 +175,18 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<DeployVareDbContext>();
     try
     {
-        // Apply migrations
-        await context.Database.MigrateAsync();
-        Log.Information("Database migrations applied successfully");
+        // For SQLite: EnsureCreated is sufficient (no migrations infra needed).
+        // For SQL Server: run pending migrations as before.
+        if (dbProvider == "sqlserver")
+        {
+            await context.Database.MigrateAsync();
+            Log.Information("Database migrations applied successfully");
+        }
+        else
+        {
+            await context.Database.EnsureCreatedAsync();
+            Log.Information("SQLite database ensured/created");
+        }
         
         // Seed admin user
         await DbSeeder.SeedAsync(context);

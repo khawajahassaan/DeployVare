@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Users,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
@@ -40,6 +41,7 @@ const allNavItems: NavItem[] = [
   { name: 'Deploy App', href: '/app-deploy', icon: Upload, requiredPermission: 'DeployApi' },
   { name: 'App History', href: '/app-history', icon: FileCode, requiredPermission: 'ViewApiHistory' },
   { name: 'Users', href: '/users', icon: Users, requiredPermission: 'ManageUsers' },
+  { name: 'Settings', href: '/settings', icon: Settings, requiredPermission: 'ManageUsers' },
 ];
 
 export default function Navigation() {

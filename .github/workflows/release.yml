@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Build matrix: Linux x64 · Windows x64 · macOS Intel · macOS ARM
+  # ─────────────────────────────────────────────────────────────
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            dotnet-rid: linux-x64
+            rust-target: x86_64-unknown-linux-gnu
+            sidecar-ext: ''
+
+          - platform: windows-x64
+            runner: windows-latest
+            dotnet-rid: win-x64
+            rust-target: x86_64-pc-windows-msvc
+            sidecar-ext: '.exe'
+
+          - platform: macos-intel
+            runner: macos-13
+            dotnet-rid: osx-x64
+            rust-target: x86_64-apple-darwin
+            sidecar-ext: ''
+
+          - platform: macos-arm
+            runner: macos-14
+            dotnet-rid: osx-arm64
+            rust-target: aarch64-apple-darwin
+            sidecar-ext: ''
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Linux system dependencies (Tauri v2 requires webkit2gtk 4.1) ──
+      - name: Install Linux system deps
+        if: matrix.platform == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            pkg-config
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './web/src-tauri -> target'
+          key: ${{ matrix.platform }}
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      # ── Publish .NET API as a self-contained single-file sidecar ──
+      - name: Build .NET sidecar
+        shell: bash
+        run: |
+          dotnet publish API \
+            -c Release \
+            -r ${{ matrix.dotnet-rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:PublishTrimmed=false \
+            -o "API/publish-${{ matrix.platform }}"
+
+          mkdir -p web/src-tauri/binaries
+
+          cp "API/publish-${{ matrix.platform }}/API${{ matrix.sidecar-ext }}" \
+            "web/src-tauri/binaries/api-server-${{ matrix.rust-target }}${{ matrix.sidecar-ext }}"
+
+          # Make executable on Unix targets
+          if [ "${{ matrix.sidecar-ext }}" = "" ]; then
+            chmod +x "web/src-tauri/binaries/api-server-${{ matrix.rust-target }}"
+          fi
+
+      # ── Build Tauri bundles ──
+      - name: Build Tauri app
+        working-directory: web
+        env:
+          # Tauri updater signing (optional — remove if not using auto-updater)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS code signing (optional — leave secrets blank to build unsigned)
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx tauri build --target ${{ matrix.rust-target }}
+
+      # ── Upload artifacts for each platform ──
+      - name: Upload Linux .deb
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-linux-deb
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/deb/*.deb
+          if-no-files-found: warn
+
+      - name: Upload Linux AppImage
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-linux-appimage
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+
+      - name: Upload Windows MSI
+        if: matrix.platform == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-windows-msi
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/msi/*.msi
+          if-no-files-found: warn
+
+      - name: Upload Windows NSIS installer
+        if: matrix.platform == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-windows-nsis
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/nsis/*.exe
+          if-no-files-found: warn
+
+      - name: Upload macOS Intel DMG
+        if: matrix.platform == 'macos-intel'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-macos-intel
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+      - name: Upload macOS ARM DMG
+        if: matrix.platform == 'macos-arm'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployvare-macos-arm
+          path: web/src-tauri/target/${{ matrix.rust-target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────
+  # Publish all artifacts to a GitHub Release
+  # ─────────────────────────────────────────────────────────────
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find release-artifacts -type f | sort
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/**/*
+          generate_release_notes: true
+          draft: false
+          # Tags like v1.0.0-beta.1 are marked as pre-release automatically
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -1,10 +1,13 @@
-name: Build Windows
+# This workflow has been superseded by release.yml which builds all platforms.
+# Kept here as reference only — the 'on:' trigger is intentionally removed.
+name: Build Windows (DISABLED — see release.yml)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      disabled:
+        description: 'This workflow is disabled. Use release.yml instead.'
+        required: false
 
 jobs:
   build-windows:

@@ -8,14 +8,17 @@ public class BackupService : IBackupService
     private readonly ISqlExecutionService _sqlExecutionService;
     private readonly ILogger<BackupService> _logger;
     private readonly string _backupRootPath;
+    private readonly IFileStorageService _storage;
 
     public BackupService(
         ISqlExecutionService sqlExecutionService,
         ILogger<BackupService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IFileStorageService storage)
     {
         _sqlExecutionService = sqlExecutionService;
         _logger = logger;
+        _storage = storage;
         
         var backupPath = configuration["FileUploadSettings:BackupPath"] ?? "wwwroot/backups";
         _backupRootPath = Path.Combine(Directory.GetCurrentDirectory(), backupPath);
@@ -126,6 +129,18 @@ To restore, execute the SQL files in your database.
             Directory.Delete(tempBackupFolder, true);
 
             _logger.LogInformation("Backup completed successfully: {ZipFile}", zipFileName);
+
+            // Upload to B2 if cloud storage is configured; otherwise serve from local disk
+            if (_storage.IsCloud)
+            {
+                var b2Key = $"backups/{zipFileName}";
+                await using var zipStream = File.OpenRead(zipFilePath);
+                await _storage.UploadAsync(b2Key, zipStream);
+                File.Delete(zipFilePath);
+                _logger.LogInformation("Backup uploaded to B2: {Key}", b2Key);
+                return b2Key;
+            }
+
             return zipFilePath;
         }
         catch (Exception ex)
