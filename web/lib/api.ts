@@ -176,6 +176,7 @@ export interface ApplicationServer {
   appPoolName: string;
   websiteName: string;
   backupPath: string;
+  serverType: 'Api' | 'Frontend';
   isActive: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -192,6 +193,7 @@ export interface ApiDeployment {
   deploymentDate: string;
   version?: string;
   status: string;
+  deploymentType: 'Api' | 'Frontend';
   backupFileName?: string;
   errorMessage?: string;
   deploymentDurationSeconds?: number;
@@ -431,6 +433,7 @@ export const api = {
     appPoolName: string;
     websiteName: string;
     backupPath?: string;
+    serverType?: 'Api' | 'Frontend';
   }): Promise<ApplicationServer> {
     const response = await apiClient.post<ApplicationServer>('/applicationservers', data);
     return response.data;
@@ -448,6 +451,7 @@ export const api = {
     websiteName?: string;
     backupPath?: string;
     isActive?: boolean;
+    serverType?: 'Api' | 'Frontend';
   }): Promise<ApplicationServer> {
     const response = await apiClient.put<ApplicationServer>(`/applicationservers/${id}`, data);
     return response.data;
@@ -495,6 +499,17 @@ export const api = {
     const response = await apiClient.get(`/apideployments/${deploymentId}/backup`, {
       responseType: 'blob',
     });
+    return response.data;
+  },
+
+  async deployFrontend(applicationServerId: number, zipFile: File, version?: string): Promise<ApiDeploymentResult> {
+    const formData = new FormData();
+    formData.append('applicationServerId', applicationServerId.toString());
+    if (version) {
+      formData.append('version', version);
+    }
+    formData.append('zipFile', zipFile);
+    const response = await apiClient.post<ApiDeploymentResult>('/apideployments/frontend', formData);
     return response.data;
   },
 

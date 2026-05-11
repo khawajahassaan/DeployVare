@@ -58,11 +58,18 @@ public class SqlExecutionService : ISqlExecutionService
     {
         using var connection = new SqlConnection(connectionString);
 
+        // INFORMATION_SCHEMA.ROUTINES for the list: guarantees all procedure names are
+        // returned even when the connection user only has EXECUTE (not VIEW DEFINITION).
+        // sys.sql_modules would silently drop those rows, making them appear as "Source Only".
+        // OBJECT_DEFINITION() returns the full untruncated text (no 4000-char limit) where
+        // VIEW DEFINITION is granted, and NULL otherwise — keeping the row in the result.
         const string query = @"
             SELECT 
-                ROUTINE_SCHEMA as [Schema],
-                ROUTINE_NAME as [Name],
-                ROUTINE_DEFINITION as [Definition]
+                ROUTINE_SCHEMA AS [Schema],
+                ROUTINE_NAME AS [Name],
+                OBJECT_DEFINITION(OBJECT_ID(
+                    QUOTENAME(ROUTINE_SCHEMA) + '.' + QUOTENAME(ROUTINE_NAME)
+                )) AS [Definition]
             FROM INFORMATION_SCHEMA.ROUTINES
             WHERE ROUTINE_TYPE = 'PROCEDURE'
             ORDER BY ROUTINE_NAME";
@@ -75,11 +82,15 @@ public class SqlExecutionService : ISqlExecutionService
     {
         using var connection = new SqlConnection(connectionString);
 
+        // INFORMATION_SCHEMA.ROUTINES for the list — same reason as GetStoredProceduresAsync.
+        // OBJECT_DEFINITION() for full untruncated definition without dropping permission-limited rows.
         const string query = @"
             SELECT 
-                ROUTINE_SCHEMA as [Schema],
-                ROUTINE_NAME as [Name],
-                ROUTINE_DEFINITION as [Definition]
+                ROUTINE_SCHEMA AS [Schema],
+                ROUTINE_NAME AS [Name],
+                OBJECT_DEFINITION(OBJECT_ID(
+                    QUOTENAME(ROUTINE_SCHEMA) + '.' + QUOTENAME(ROUTINE_NAME)
+                )) AS [Definition]
             FROM INFORMATION_SCHEMA.ROUTINES
             WHERE ROUTINE_TYPE = 'FUNCTION'
             ORDER BY ROUTINE_NAME";
@@ -92,12 +103,15 @@ public class SqlExecutionService : ISqlExecutionService
     {
         using var connection = new SqlConnection(connectionString);
 
+        // sys.sql_modules.definition is nvarchar(MAX) — no 4000-char truncation
         const string query = @"
-            SELECT ROUTINE_DEFINITION
-            FROM INFORMATION_SCHEMA.ROUTINES
-            WHERE ROUTINE_TYPE = 'PROCEDURE' 
-              AND ROUTINE_SCHEMA = @Schema
-              AND ROUTINE_NAME = @ProcedureName";
+            SELECT m.definition
+            FROM sys.sql_modules m
+            JOIN sys.objects o ON o.object_id = m.object_id
+            JOIN sys.schemas s ON s.schema_id = o.schema_id
+            WHERE o.type = 'P'
+              AND s.name = @Schema
+              AND o.name = @ProcedureName";
 
         var definition = await connection.QueryFirstOrDefaultAsync<string>(query, new { Schema = schema, ProcedureName = procedureName });
         return definition ?? string.Empty;
@@ -107,12 +121,15 @@ public class SqlExecutionService : ISqlExecutionService
     {
         using var connection = new SqlConnection(connectionString);
 
+        // sys.sql_modules.definition is nvarchar(MAX) — no 4000-char truncation
         const string query = @"
-            SELECT ROUTINE_DEFINITION
-            FROM INFORMATION_SCHEMA.ROUTINES
-            WHERE ROUTINE_TYPE = 'FUNCTION' 
-              AND ROUTINE_SCHEMA = @Schema
-              AND ROUTINE_NAME = @FunctionName";
+            SELECT m.definition
+            FROM sys.sql_modules m
+            JOIN sys.objects o ON o.object_id = m.object_id
+            JOIN sys.schemas s ON s.schema_id = o.schema_id
+            WHERE o.type IN ('FN', 'IF', 'TF')
+              AND s.name = @Schema
+              AND o.name = @FunctionName";
 
         var definition = await connection.QueryFirstOrDefaultAsync<string>(query, new { Schema = schema, FunctionName = functionName });
         return definition ?? string.Empty;

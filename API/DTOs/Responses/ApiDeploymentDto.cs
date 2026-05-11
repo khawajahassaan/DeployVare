@@ -12,6 +12,7 @@ public class ApiDeploymentDto
     public DateTime DeploymentDate { get; set; }
     public string? Version { get; set; }
     public ApiDeploymentStatus Status { get; set; }
+    public string DeploymentType { get; set; } = "Api";
     public string? BackupFileName { get; set; }
     public string? ErrorMessage { get; set; }
     public int? DeploymentDurationSeconds { get; set; }
@@ -28,8 +29,5 @@ public class ApiDeploymentFileDto
     public string? FileHash { get; set; }
     public DateTime UploadedAt { get; set; }
 }
-
-
-
 
 

@@ -38,6 +38,11 @@ public interface IIisManagementService
     /// Gets the status of App Pool and Website
     /// </summary>
     Task<(bool AppPoolRunning, bool WebsiteRunning, string Message)> GetServiceStatusAsync(ApplicationServer server);
+
+    /// <summary>
+    /// Deploys a frontend ZIP file to the remote server by extracting it with Expand-Archive -Force
+    /// </summary>
+    Task<(bool Success, string Message)> DeployFrontendZipAsync(ApplicationServer server, string localZipPath);
 }
 
 

@@ -81,6 +81,42 @@ DeployVare/
 
 ---
 
+## 🖥️ Desktop App (Tauri)
+
+DeployVare ships as a self-contained Linux desktop app (`.deb`) that bundles the .NET API as a sidecar process — no separate server needed.
+
+### Build & Install
+
+```bash
+cd ~/Projects/DeployVare/web
+
+# 1. Build the sidecar (.NET API) + Tauri frontend and package as .deb
+npm run tauri:full-build
+
+# 2. Install (overwrites any existing version)
+sudo dpkg -i src-tauri/target/release/bundle/deb/DeployVare_1.0.0_amd64.deb
+
+# 3. Launch
+deployvare
+```
+
+> **What `tauri:full-build` does:**
+> 1. `dotnet publish` — compiles the API as a self-contained Linux x64 binary
+> 2. Copies the binary to `src-tauri/binaries/` as the Tauri sidecar
+> 3. `tauri build` — compiles the frontend, bundles everything, and produces the `.deb`
+
+### Re-installing / Upgrading
+
+`dpkg -i` with `sudo` will overwrite the currently installed version automatically. No need to uninstall first.
+
+### Uninstall
+
+```bash
+sudo dpkg -r deployvare
+```
+
+---
+
 ## ⚡ Quick Start
 
 ### Prerequisites

@@ -2,6 +2,7 @@ using API.Data;
 using API.DTOs.Requests;
 using API.DTOs.Responses;
 using API.Models.Entities;
+using API.Models.Enums;
 using API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -68,6 +69,7 @@ public class ApplicationServerService : IApplicationServerService
                 AppPoolName = request.AppPoolName,
                 WebsiteName = request.WebsiteName,
                 BackupPath = request.BackupPath,
+                ServerType = request.ServerType,
                 IsActive = true
             };
 
@@ -107,6 +109,7 @@ public class ApplicationServerService : IApplicationServerService
             AppPoolName = server.AppPoolName,
             WebsiteName = server.WebsiteName,
             BackupPath = server.BackupPath,
+            ServerType = server.ServerType.ToString(),
             IsActive = server.IsActive,
             CreatedAt = server.CreatedAt,
             UpdatedAt = server.UpdatedAt,
@@ -136,6 +139,7 @@ public class ApplicationServerService : IApplicationServerService
             AppPoolName = server.AppPoolName,
             WebsiteName = server.WebsiteName,
             BackupPath = server.BackupPath,
+            ServerType = server.ServerType.ToString(),
             IsActive = server.IsActive,
             CreatedAt = server.CreatedAt,
             UpdatedAt = server.UpdatedAt,
@@ -166,6 +170,7 @@ public class ApplicationServerService : IApplicationServerService
             AppPoolName = server.AppPoolName,
             WebsiteName = server.WebsiteName,
             BackupPath = server.BackupPath,
+            ServerType = server.ServerType.ToString(),
             IsActive = server.IsActive,
             CreatedAt = server.CreatedAt,
             UpdatedAt = server.UpdatedAt,
@@ -212,6 +217,9 @@ public class ApplicationServerService : IApplicationServerService
         
         if (request.IsActive.HasValue)
             server.IsActive = request.IsActive.Value;
+
+        if (request.ServerType.HasValue)
+            server.ServerType = request.ServerType.Value;
 
         server.UpdatedAt = DateTime.UtcNow;
 

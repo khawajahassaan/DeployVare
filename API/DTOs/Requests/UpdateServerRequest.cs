@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using API.Models.Enums;
 
 namespace API.DTOs.Requests;
 
@@ -33,9 +34,8 @@ public class UpdateServerRequest
     public string? BackupPath { get; set; }
 
     public bool? IsActive { get; set; }
+
+    public ServerType? ServerType { get; set; }
 }
-
-
-
 
 

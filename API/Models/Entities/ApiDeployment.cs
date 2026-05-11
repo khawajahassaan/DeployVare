@@ -35,6 +35,8 @@ public class ApiDeployment
     [MaxLength(500)]
     public string? LocalBackupPath { get; set; } // Path where backup is downloaded to DeployVare server
 
+    public AppDeploymentType DeploymentType { get; set; } = AppDeploymentType.Api;
+
     public string? ErrorMessage { get; set; }
 
     public int? DeploymentDurationSeconds { get; set; }

@@ -195,7 +195,18 @@ export default function ComparePage() {
                 <div className="flex items-center justify-between">
                   <div 
                     className="flex items-center gap-2 flex-1 cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => toggleObject(diff.objectName, objectType as 'procedure' | 'function')}
+                    onClick={() => {
+                      if (objectType === 'table') {
+                        // Tables have no lazy-load endpoint — just toggle expand in place
+                        setExpandedObjects(prev => {
+                          const next = new Set(prev);
+                          if (next.has(key)) next.delete(key); else next.add(key);
+                          return next;
+                        });
+                      } else {
+                        toggleObject(diff.objectName, objectType as 'procedure' | 'function');
+                      }
+                    }}
                   >
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4" />
@@ -232,7 +243,14 @@ export default function ComparePage() {
               </CardHeader>
               {isExpanded && (
                 <CardContent>
-                  {isLoading ? (
+                  {objectType === 'table' ? (
+                    // Tables: show pre-computed column diff from the comparison result
+                    diff.changes && diff.changes.length > 0 ? (
+                      <DiffViewer changes={diff.changes} />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No changes available</p>
+                    )
+                  ) : isLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       <span className="ml-2 text-sm text-muted-foreground">Loading details...</span>

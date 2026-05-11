@@ -24,6 +24,11 @@ public interface IApiDeploymentService
     /// Downloads the backup file from a deployment
     /// </summary>
     Task<(bool Success, string? FilePath, string Message)> DownloadBackupAsync(int deploymentId);
+
+    /// <summary>
+    /// Deploys a frontend ZIP to a remote server
+    /// </summary>
+    Task<ApiDeploymentResultDto> DeployFrontendAsync(DeployFrontendRequest request, int userId);
 }
 
 

@@ -14,6 +14,8 @@ export function DiffViewer({ changes, className }: DiffViewerProps) {
           const isAdded = line.startsWith('+');
           const isRemoved = line.startsWith('-');
           const isUnchanged = line.startsWith(' ');
+          const isIdentical = line.startsWith('=');
+          const isInfo = line.startsWith('~');
 
           return (
             <div
@@ -22,7 +24,9 @@ export function DiffViewer({ changes, className }: DiffViewerProps) {
                 'px-2 py-0.5',
                 isAdded && 'bg-green-100 dark:bg-green-950/30 text-green-800 dark:text-green-200',
                 isRemoved && 'bg-red-100 dark:bg-red-950/30 text-red-800 dark:text-red-200',
-                isUnchanged && 'text-muted-foreground'
+                isUnchanged && 'text-muted-foreground',
+                isIdentical && 'text-muted-foreground italic',
+                isInfo && 'text-blue-700 dark:text-blue-300',
               )}
             >
               {line}

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using API.Models.Enums;
 
 namespace API.DTOs.Requests;
 
@@ -40,9 +41,8 @@ public class CreateServerRequest
 
     [MaxLength(500)]
     public string BackupPath { get; set; } = @"C:\DeployVare\Backups";
+
+    public ServerType ServerType { get; set; } = ServerType.Api;
 }
-
-
-
 
 

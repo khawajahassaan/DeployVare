@@ -305,6 +305,70 @@ public class IisManagementService : IIisManagementService
         return (false, false, error);
     }
 
+    public async Task<(bool Success, string Message)> DeployFrontendZipAsync(ApplicationServer server, string localZipPath)
+    {
+        _logger.LogInformation($"Deploying frontend ZIP to {server.HostName}:{server.DeploymentPath}");
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var remoteTempDir = $"C:\\Temp\\DVFrontend_{timestamp}";
+        var remoteZipPath = $"{remoteTempDir}\\upload.zip";
+
+        var (password, privateKey) = await GetCredentialsAsync(server);
+
+        // Upload zip to remote temp dir — create dir first
+        var mkdirCmd = $"New-Item -Path '{remoteTempDir}' -ItemType Directory -Force | Out-Null";
+        var (mkdirOk, _, mkdirErr) = await _sshService.ExecutePowerShellCommandAsync(
+            server.HostName, server.Port, server.Username, password, privateKey, mkdirCmd);
+
+        if (!mkdirOk)
+        {
+            return (false, $"Failed to create remote temp directory: {mkdirErr}");
+        }
+
+        // Upload the ZIP file
+        var uploadOk = await _sshService.UploadFileAsync(
+            server.HostName, server.Port, server.Username, password, privateKey,
+            localZipPath, remoteZipPath.Replace("\\", "/"));
+
+        if (!uploadOk)
+        {
+            return (false, "Failed to upload ZIP file to remote server");
+        }
+
+        // Ensure deployment path exists, then extract ZIP with -Force (web.config preserved)
+        var extractCmd = $@"
+            $ProgressPreference = 'SilentlyContinue';
+            $ErrorActionPreference = 'Stop';
+            try {{
+                if (-not (Test-Path '{server.DeploymentPath}')) {{
+                    New-Item -Path '{server.DeploymentPath}' -ItemType Directory -Force | Out-Null;
+                }}
+                Expand-Archive -Path '{remoteZipPath}' -DestinationPath '{server.DeploymentPath}' -Force;
+                Remove-Item -Path '{remoteTempDir}' -Recurse -Force;
+                Write-Output 'FRONTEND_DEPLOY_SUCCESS';
+            }} catch {{
+                Write-Output ""FRONTEND_DEPLOY_ERROR: $($_.Exception.Message)"";
+                exit 1;
+            }}
+        ";
+
+        var (extractOk, extractOut, extractErr) = await _sshService.ExecutePowerShellCommandAsync(
+            server.HostName, server.Port, server.Username, password, privateKey, extractCmd);
+
+        if (extractOk && extractOut.Contains("FRONTEND_DEPLOY_SUCCESS"))
+        {
+            _logger.LogInformation("Frontend ZIP deployed successfully");
+            return (true, "Frontend files extracted successfully");
+        }
+
+        var errMsg = extractOut.Contains("FRONTEND_DEPLOY_ERROR")
+            ? extractOut
+            : string.IsNullOrEmpty(extractErr) ? extractOut : extractErr;
+
+        _logger.LogError($"Frontend extraction failed: {errMsg}");
+        return (false, $"Failed to extract frontend ZIP: {errMsg}");
+    }
+
     private async Task<(string? password, string? privateKey)> GetCredentialsAsync(ApplicationServer server)
     {
         string? password = null;

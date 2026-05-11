@@ -13,14 +13,12 @@ public class ApplicationServerDto
     public string AppPoolName { get; set; } = string.Empty;
     public string WebsiteName { get; set; } = string.Empty;
     public string BackupPath { get; set; } = string.Empty;
+    public string ServerType { get; set; } = "Api";
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public int TotalDeployments { get; set; }
     public DateTime? LastDeploymentDate { get; set; }
 }
-
-
-
 
 

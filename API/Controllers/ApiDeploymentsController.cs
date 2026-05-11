@@ -127,6 +127,64 @@ public class ApiDeploymentsController : ControllerBase
     }
 
     /// <summary>
+    /// Deploy a frontend ZIP to a server
+    /// </summary>
+    [HttpPost("frontend")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> DeployFrontend([FromForm] DeployFrontendRequest request)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (request.ZipFile == null || request.ZipFile.Length == 0)
+            {
+                return BadRequest(new { error = "No ZIP file provided" });
+            }
+
+            if (!request.ZipFile.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { error = "Only .zip files are accepted for frontend deployments" });
+            }
+
+            var nameIdentifierClaims = User.Claims
+                .Where(c => c.Type == ClaimTypes.NameIdentifier ||
+                           c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
+                .ToList();
+
+            int userId = 0;
+            foreach (var claim in nameIdentifierClaims)
+            {
+                if (int.TryParse(claim.Value, out userId))
+                {
+                    break;
+                }
+            }
+
+            if (userId == 0)
+            {
+                return Unauthorized(new { error = "Invalid user token - user ID not found" });
+            }
+
+            _logger.LogInformation($"Starting frontend deployment for server {request.ApplicationServerId} by user {userId}");
+
+            var result = await _deploymentService.DeployFrontendAsync(request, userId);
+
+            return result.Status == Models.Enums.ApiDeploymentStatus.Success
+                ? Ok(result)
+                : StatusCode(500, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during frontend deployment");
+            return StatusCode(500, new { error = "An error occurred during frontend deployment", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Download backup file for a deployment
     /// </summary>
     [HttpGet("{deploymentId}/backup")]

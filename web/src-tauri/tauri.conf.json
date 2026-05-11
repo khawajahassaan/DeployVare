@@ -4,7 +4,7 @@
   "identifier": "com.deployvare.app",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "TAURI_BUILD=1 npm run build",
+    "beforeBuildCommand": "npx cross-env TAURI_BUILD=1 npm run build",
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000"
   },

@@ -245,8 +245,9 @@ public class SchemaComparisonService : ISchemaComparisonService
         var differences = new List<SchemaObjectDiff>();
         int processedCount = 0;
 
-        var sourceDict = sourceProcedures.ToDictionary(p => $"{p.Schema}.{p.Name}");
-        var targetDict = targetProcedures.ToDictionary(p => $"{p.Schema}.{p.Name}");
+        // OrdinalIgnoreCase prevents false "Added" when schema casing differs (e.g. dbo vs DBO)
+        var sourceDict = sourceProcedures.ToDictionary(p => $"{p.Schema}.{p.Name}", StringComparer.OrdinalIgnoreCase);
+        var targetDict = targetProcedures.ToDictionary(p => $"{p.Schema}.{p.Name}", StringComparer.OrdinalIgnoreCase);
 
         _logger.LogInformation($"Comparing {sourceProcedures.Count} source procedures with {targetProcedures.Count} target procedures...");
 
@@ -364,8 +365,9 @@ public class SchemaComparisonService : ISchemaComparisonService
     {
         var differences = new List<SchemaObjectDiff>();
 
-        var sourceDict = sourceFunctions.ToDictionary(f => $"{f.Schema}.{f.Name}");
-        var targetDict = targetFunctions.ToDictionary(f => $"{f.Schema}.{f.Name}");
+        // OrdinalIgnoreCase prevents false "Added" when schema casing differs (e.g. dbo vs DBO)
+        var sourceDict = sourceFunctions.ToDictionary(f => $"{f.Schema}.{f.Name}", StringComparer.OrdinalIgnoreCase);
+        var targetDict = targetFunctions.ToDictionary(f => $"{f.Schema}.{f.Name}", StringComparer.OrdinalIgnoreCase);
 
         _logger.LogInformation($"Comparing {sourceFunctions.Count} source functions with {targetFunctions.Count} target functions...");
 
@@ -522,8 +524,13 @@ public class SchemaComparisonService : ISchemaComparisonService
         if (string.IsNullOrWhiteSpace(text))
             return string.Empty;
 
-        // Normalize whitespace for consistent comparison
-        var normalizedText = text.Trim();
+        // Normalize line endings and whitespace so that CRLF vs LF differences
+        // (common between Windows source DB and Linux target DB) don't produce
+        // false "Modified" results.
+        var normalizedText = text
+            .Replace("\r\n", "\n")
+            .Replace("\r", "\n")
+            .Trim();
 
         using var md5 = MD5.Create();
         var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(normalizedText));
@@ -562,21 +569,21 @@ public class SchemaComparisonService : ISchemaComparisonService
         else if (!string.IsNullOrEmpty(sourceDefinition) && string.IsNullOrEmpty(targetDefinition))
             status = "Added";
 
-        // Generate diff - guard against O(m×n) LCS hang for large definitions.
-        // Convention: GenerateLineDiff(old=target, new=source) so that:
-        //   green (+) = lines in SOURCE (would be added to target on transfer)
-        //   red   (-) = lines in TARGET (would be removed from target on transfer)
+        // Generate diff.
+        // Guard is based on the LCS cell count (lines × lines), not character count,
+        // because LCS complexity is O(m*n) where m/n are line counts — not char counts.
+        // A 50 KB procedure with 400 lines vs 200 lines = 80 000 cells: trivially fast.
+        // Only skip the diff when the product would genuinely be expensive (>1M cells).
         string diff;
-        const int MaxDiffSize = 30_000; // ~300-400 lines; beyond this the LCS is too slow
-        if ((sourceDefinition?.Length ?? 0) > MaxDiffSize || (targetDefinition?.Length ?? 0) > MaxDiffSize)
+        var sourceLineCount = sourceDefinition?.Split('\n').Length ?? 0;
+        var targetLineCount = targetDefinition?.Split('\n').Length ?? 0;
+        if ((long)sourceLineCount * targetLineCount > 1_000_000)
         {
-            var sourceLines = sourceDefinition?.Split('\n').Length ?? 0;
-            var targetLines = targetDefinition?.Split('\n').Length ?? 0;
             diff = string.Join(Environment.NewLine, new[]
             {
                 $"~ Definition too large for inline diff",
-                $"  Source: {sourceDefinition?.Length ?? 0} chars / {sourceLines} lines",
-                $"  Target: {targetDefinition?.Length ?? 0} chars / {targetLines} lines",
+                $"  Source: {sourceDefinition?.Length ?? 0} chars / {sourceLineCount} lines",
+                $"  Target: {targetDefinition?.Length ?? 0} chars / {targetLineCount} lines",
                 "  [Scroll down to view full Source / Target definitions]"
             });
         }

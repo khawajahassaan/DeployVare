@@ -180,6 +180,11 @@ public class DeployVareDbContext : DbContext
             entity.Property(e => e.WebsiteName).IsRequired().HasMaxLength(200);
             entity.Property(e => e.BackupPath).HasMaxLength(500).HasDefaultValue(@"C:\DeployVare\Backups");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.ServerType)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Api'");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             entity.HasOne(e => e.Application)
@@ -203,6 +208,11 @@ public class DeployVareDbContext : DbContext
                 .HasMaxLength(50);
             entity.Property(e => e.BackupFileName).HasMaxLength(500);
             entity.Property(e => e.LocalBackupPath).HasMaxLength(500);
+            entity.Property(e => e.DeploymentType)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Api'");
             entity.Property(e => e.DeploymentDate).HasDefaultValueSql("GETUTCDATE()");
 
             entity.HasOne(e => e.ApplicationServer)

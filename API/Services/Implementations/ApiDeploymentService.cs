@@ -269,6 +269,7 @@ public class ApiDeploymentService : IApiDeploymentService
             DeploymentDate = d.DeploymentDate,
             Version = d.Version,
             Status = d.Status,
+            DeploymentType = d.DeploymentType.ToString(),
             BackupFileName = d.BackupFileName,
             ErrorMessage = d.ErrorMessage,
             DeploymentDurationSeconds = d.DeploymentDurationSeconds,
@@ -306,6 +307,7 @@ public class ApiDeploymentService : IApiDeploymentService
             DeploymentDate = deployment.DeploymentDate,
             Version = deployment.Version,
             Status = deployment.Status,
+            DeploymentType = deployment.DeploymentType.ToString(),
             BackupFileName = deployment.BackupFileName,
             ErrorMessage = deployment.ErrorMessage,
             DeploymentDurationSeconds = deployment.DeploymentDurationSeconds,
@@ -362,6 +364,182 @@ public class ApiDeploymentService : IApiDeploymentService
         }
 
         return (false, null, "Failed to download backup file");
+    }
+
+    public async Task<ApiDeploymentResultDto> DeployFrontendAsync(DeployFrontendRequest request, int userId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var deploymentSteps = new List<string>();
+        var startTime = DateTime.UtcNow;
+
+        var server = await _context.ApplicationServers
+            .Include(s => s.Application)
+            .FirstOrDefaultAsync(s => s.Id == request.ApplicationServerId);
+
+        if (server == null)
+        {
+            return new ApiDeploymentResultDto
+            {
+                Status = ApiDeploymentStatus.Failed,
+                Message = "Application server not found",
+                ErrorMessage = "Server configuration does not exist",
+                StartedAt = startTime,
+                CompletedAt = DateTime.UtcNow
+            };
+        }
+
+        var deployment = new ApiDeployment
+        {
+            ApplicationServerId = request.ApplicationServerId,
+            DeployedBy = userId,
+            Version = request.Version,
+            Status = ApiDeploymentStatus.Pending,
+            DeploymentType = AppDeploymentType.Frontend,
+            StartedAt = startTime
+        };
+
+        _context.ApiDeployments.Add(deployment);
+        await _context.SaveChangesAsync();
+
+        // Save ZIP to temp
+        var tempDir = Path.Combine(Path.GetTempPath(), "DeployVare", $"frontend_{deployment.Id}");
+        Directory.CreateDirectory(tempDir);
+        var localZipPath = Path.Combine(tempDir, "upload.zip");
+
+        try
+        {
+            using (var stream = new FileStream(localZipPath, FileMode.Create))
+            {
+                await request.ZipFile.CopyToAsync(stream);
+            }
+
+            // Step 1: Stop services
+            deploymentSteps.Add($"Stopping IIS services on {server.ServerName}...");
+            deployment.Status = ApiDeploymentStatus.StoppingServices;
+            await _context.SaveChangesAsync();
+
+            var (appPoolStopped, appPoolMsg) = await _iisService.StopAppPoolAsync(server);
+            if (!appPoolStopped) throw new Exception($"Failed to stop App Pool: {appPoolMsg}");
+            deploymentSteps.Add($"✓ App Pool stopped");
+
+            var (websiteStopped, websiteMsg) = await _iisService.StopWebsiteAsync(server);
+            if (!websiteStopped) throw new Exception($"Failed to stop Website: {websiteMsg}");
+            deploymentSteps.Add($"✓ Website stopped");
+
+            // Step 2: Backup
+            deploymentSteps.Add("Creating backup of existing files...");
+            deployment.Status = ApiDeploymentStatus.CreatingBackup;
+            await _context.SaveChangesAsync();
+
+            var (backupCreated, backupFileName, backupMsg) = await _iisService.CreateBackupAsync(server);
+            if (!backupCreated) throw new Exception($"Failed to create backup: {backupMsg}");
+
+            if (!string.IsNullOrEmpty(backupFileName))
+            {
+                deployment.BackupFileName = backupFileName;
+                await _context.SaveChangesAsync();
+                deploymentSteps.Add($"✓ Backup created: {backupFileName}");
+            }
+            else
+            {
+                deploymentSteps.Add($"⊘ Backup skipped: {backupMsg}");
+            }
+
+            // Step 3: Upload and extract ZIP
+            deploymentSteps.Add("Uploading and extracting frontend ZIP...");
+            deployment.Status = ApiDeploymentStatus.UploadingFiles;
+            await _context.SaveChangesAsync();
+
+            var (deployed, deployMsg) = await _iisService.DeployFrontendZipAsync(server, localZipPath);
+            if (!deployed) throw new Exception($"Failed to deploy frontend: {deployMsg}");
+            deploymentSteps.Add($"✓ Frontend files extracted successfully");
+
+            // Step 4: Start services
+            deploymentSteps.Add("Starting IIS services...");
+            deployment.Status = ApiDeploymentStatus.StartingServices;
+            await _context.SaveChangesAsync();
+
+            var (websiteStarted, websiteStartMsg) = await _iisService.StartWebsiteAsync(server);
+            if (!websiteStarted) throw new Exception($"Failed to start Website: {websiteStartMsg}");
+            deploymentSteps.Add($"✓ Website started");
+
+            var (appPoolStarted, appPoolStartMsg) = await _iisService.StartAppPoolAsync(server);
+            if (!appPoolStarted) throw new Exception($"Failed to start App Pool: {appPoolStartMsg}");
+            deploymentSteps.Add($"✓ App Pool started");
+
+            // Step 5: Verify
+            deploymentSteps.Add("Verifying deployment...");
+            deployment.Status = ApiDeploymentStatus.Verifying;
+            await _context.SaveChangesAsync();
+
+            await Task.Delay(2000);
+
+            var (verified, verifyMsg) = await _iisService.VerifyDeploymentAsync(server);
+            deploymentSteps.Add(verified
+                ? "✓ Deployment verified successfully"
+                : $"⚠ Verification warning: {verifyMsg}");
+
+            stopwatch.Stop();
+            deployment.Status = ApiDeploymentStatus.Success;
+            deployment.CompletedAt = DateTime.UtcNow;
+            deployment.DeploymentDurationSeconds = (int)stopwatch.Elapsed.TotalSeconds;
+            await _context.SaveChangesAsync();
+
+            try { Directory.Delete(tempDir, true); } catch { }
+
+            deploymentSteps.Add($"✓ Deployment completed in {stopwatch.Elapsed.TotalSeconds:F1} seconds!");
+            _logger.LogInformation($"Frontend deployment {deployment.Id} completed successfully");
+
+            return new ApiDeploymentResultDto
+            {
+                DeploymentId = deployment.Id,
+                Status = ApiDeploymentStatus.Success,
+                Message = "Frontend deployment completed successfully",
+                BackupFileName = backupFileName,
+                DeploymentDurationSeconds = (int)stopwatch.Elapsed.TotalSeconds,
+                DeploymentSteps = deploymentSteps,
+                StartedAt = startTime,
+                CompletedAt = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, $"Frontend deployment {deployment.Id} failed");
+
+            deployment.Status = ApiDeploymentStatus.Failed;
+            deployment.ErrorMessage = ex.Message;
+            deployment.CompletedAt = DateTime.UtcNow;
+            deployment.DeploymentDurationSeconds = (int)stopwatch.Elapsed.TotalSeconds;
+            await _context.SaveChangesAsync();
+
+            deploymentSteps.Add($"✗ Deployment failed: {ex.Message}");
+
+            try
+            {
+                await _iisService.StartWebsiteAsync(server);
+                await _iisService.StartAppPoolAsync(server);
+                deploymentSteps.Add("Services restarted after failure");
+            }
+            catch (Exception restartEx)
+            {
+                deploymentSteps.Add($"Failed to restart services: {restartEx.Message}");
+            }
+
+            try { Directory.Delete(tempDir, true); } catch { }
+
+            return new ApiDeploymentResultDto
+            {
+                DeploymentId = deployment.Id,
+                Status = ApiDeploymentStatus.Failed,
+                Message = "Frontend deployment failed",
+                ErrorMessage = ex.Message,
+                DeploymentDurationSeconds = (int)stopwatch.Elapsed.TotalSeconds,
+                DeploymentSteps = deploymentSteps,
+                StartedAt = startTime,
+                CompletedAt = DateTime.UtcNow
+            };
+        }
     }
 
     private async Task<Dictionary<string, (long size, string hash)>> SaveUploadedFilesAsync(List<IFormFile> files, int deploymentId)

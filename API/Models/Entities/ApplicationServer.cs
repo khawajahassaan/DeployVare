@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using API.Models.Enums;
 
 namespace API.Models.Entities;
 
@@ -48,6 +49,8 @@ public class ApplicationServer
 
     [MaxLength(500)]
     public string BackupPath { get; set; } = @"C:\DeployVare\Backups"; // Where to store backups on remote server
+
+    public ServerType ServerType { get; set; } = ServerType.Api;
 
     public bool IsActive { get; set; } = true;
 

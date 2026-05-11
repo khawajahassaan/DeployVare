@@ -17,7 +17,7 @@ namespace API.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.22")
+                .HasAnnotation("ProductVersion", "8.0.25")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -50,6 +50,13 @@ namespace API.Migrations
 
                     b.Property<int?>("DeploymentDurationSeconds")
                         .HasColumnType("int");
+
+                    b.Property<string>("DeploymentType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValueSql("'Api'");
 
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("nvarchar(max)");
@@ -208,6 +215,13 @@ namespace API.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ServerType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValueSql("'Api'");
 
                     b.Property<string>("SshPrivateKey")
                         .HasMaxLength(2000)

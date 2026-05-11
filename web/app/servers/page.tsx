@@ -30,6 +30,7 @@ export default function ServersPage() {
     appPoolName: '',
     websiteName: '',
     backupPath: 'C:\\DeployVare\\Backups',
+    serverType: 'Api' as 'Api' | 'Frontend',
   });
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function ServersPage() {
       appPoolName: '',
       websiteName: '',
       backupPath: 'C:\\DeployVare\\Backups',
+      serverType: 'Api',
     });
     setEditingServer(null);
   };
@@ -122,6 +124,7 @@ export default function ServersPage() {
       appPoolName: server.appPoolName,
       websiteName: server.websiteName,
       backupPath: server.backupPath,
+      serverType: server.serverType,
     });
     setShowDialog(true);
   };
@@ -171,6 +174,10 @@ export default function ServersPage() {
                   </div>
                   <Badge variant={server.isActive ? 'default' : 'secondary'}>
                     {server.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                  <Badge variant={server.serverType === 'Frontend' ? 'outline' : 'secondary'}
+                    className={server.serverType === 'Frontend' ? 'border-blue-500 text-blue-600' : ''}>
+                    {server.serverType}
                   </Badge>
                 </div>
               </CardHeader>
@@ -280,6 +287,34 @@ export default function ServersPage() {
                           placeholder="Production Server 1"
                           required
                         />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Server Type *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="serverType"
+                            value="Api"
+                            checked={formData.serverType === 'Api'}
+                            onChange={() => setFormData({ ...formData, serverType: 'Api' })}
+                          />
+                          <span className="text-sm font-medium">API Server</span>
+                          <span className="text-xs text-muted-foreground">(deploy .dll / .exe files)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="serverType"
+                            value="Frontend"
+                            checked={formData.serverType === 'Frontend'}
+                            onChange={() => setFormData({ ...formData, serverType: 'Frontend' })}
+                          />
+                          <span className="text-sm font-medium">Frontend Server</span>
+                          <span className="text-xs text-muted-foreground">(deploy .zip build)</span>
+                        </label>
                       </div>
                     </div>
 

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Kill any running api-server sidecar so the new binary can be written.
+# dpkg replaces the file on disk but can't overwrite a binary that's currently
+# mapped into a running process — and the old process would keep serving stale
+# code even after the upgrade if we don't stop it here.
+pkill -x api-server 2>/dev/null || true
+exit 0

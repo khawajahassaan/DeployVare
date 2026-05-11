@@ -37,8 +37,8 @@ const allNavItems: NavItem[] = [
   { name: 'SQL History', href: '/history', icon: History, requiredPermission: 'ViewSqlHistory' },
   { name: 'Compare', href: '/compare', icon: GitCompare, requiredPermission: 'CompareSchemas' },
   { name: 'Servers', href: '/servers', icon: Server, requiredPermission: 'ManageServers' },
-  { name: 'Deploy API', href: '/api-deploy', icon: Upload, requiredPermission: 'DeployApi' },
-  { name: 'API History', href: '/api-history', icon: FileCode, requiredPermission: 'ViewApiHistory' },
+  { name: 'Deploy App', href: '/app-deploy', icon: Upload, requiredPermission: 'DeployApi' },
+  { name: 'App History', href: '/app-history', icon: FileCode, requiredPermission: 'ViewApiHistory' },
   { name: 'Users', href: '/users', icon: Users, requiredPermission: 'ManageUsers' },
 ];
 
