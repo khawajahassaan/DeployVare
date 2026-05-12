@@ -107,20 +107,65 @@ jobs:
             chmod +x "web/src-tauri/binaries/api-server-${{ matrix.rust-target }}"
           fi
 
-      # ── Build Tauri bundles ──
-      - name: Build Tauri app
-        working-directory: web
+      # ── macOS: Import signing certificate into a temporary keychain ──
+      # This step only runs on macOS runners. If APPLE_CERTIFICATE is not set
+      # (secret absent or empty) the app builds unsigned — no error, just a warning.
+      # When the secret IS set (valid base64 .p12 + password), the certificate is
+      # imported and all APPLE_* vars are written to $GITHUB_ENV so the tauri build
+      # step picks them up automatically.
+      - name: Set up macOS code signing
+        if: matrix.platform == 'macos-intel' || matrix.platform == 'macos-arm'
         env:
-          # Tauri updater signing (optional — remove if not using auto-updater)
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code signing (optional — leave secrets blank to build unsigned)
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "APPLE_CERTIFICATE not set – building unsigned DMG (no codesign step)"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+
+          # Decode the base64-encoded .p12 certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          # Create a short-lived temporary keychain
+          security create-keychain -p "ci-temp-password" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "ci-temp-password" "$KEYCHAIN_PATH"
+
+          # Import certificate and allow codesign to use it without a UI prompt
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -f pkcs12
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "ci-temp-password" "$KEYCHAIN_PATH"
+
+          # Propagate vars to the tauri build step (only write non-empty values)
+          echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"             >> "$GITHUB_ENV"
+          echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"
+          [ -n "$APPLE_SIGNING_IDENTITY" ] && echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          [ -n "$APPLE_ID" ]               && echo "APPLE_ID=$APPLE_ID"                             >> "$GITHUB_ENV"
+          [ -n "$APPLE_PASSWORD" ]         && echo "APPLE_PASSWORD=$APPLE_PASSWORD"                 >> "$GITHUB_ENV"
+          [ -n "$APPLE_TEAM_ID" ]          && echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"                   >> "$GITHUB_ENV"
+
+      # ── Build Tauri bundles ──
+      # Apple signing vars are NOT injected here as literal secrets — they only
+      # exist in $GITHUB_ENV when the keychain setup step above populated them.
+      # Passing empty secrets directly was the cause of the SecKeychainItemImport error.
+      - name: Build Tauri app
+        working-directory: web
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build --target ${{ matrix.rust-target }}
 
       # ── Upload artifacts for each platform ──
