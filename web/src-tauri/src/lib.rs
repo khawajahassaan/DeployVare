@@ -11,7 +11,7 @@ use tauri_plugin_shell::ShellExt;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AppConfig {
-    db_mode: String,          // "local" | "cloud"
+    db_mode: String,          // "local" | "sqlserver"
     connection_string: String, // blank for local (SQLite path derived at runtime)
     b2_enabled: bool,
     b2_key_id: String,
@@ -86,6 +86,18 @@ fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
 
 #[tauri::command]
 fn restart_app(app: AppHandle) {
+    // Kill the sidecar first so the new instance can bind to port 5233.
+    // app.restart() calls std::process::exit() which bypasses RunEvent::ExitRequested,
+    // so the sidecar would otherwise stay alive as an orphan and block the port.
+    if let Some(state) = app.try_state::<ApiProcess>() {
+        if let Ok(mut guard) = state.0.lock() {
+            if let Some(child) = guard.take() {
+                let _ = child.kill();
+            }
+        }
+    }
+    // Brief pause so the OS can reclaim the port before the new process spawns.
+    std::thread::sleep(std::time::Duration::from_millis(400));
     app.restart();
 }
 
@@ -101,7 +113,7 @@ pub fn run() {
             let config = load_config(app.handle());
 
             // Derive DB env vars from the loaded config
-            let (db_provider, db_conn_str) = if config.db_mode == "cloud" && !config.connection_string.is_empty() {
+            let (db_provider, db_conn_str) = if config.db_mode == "sqlserver" && !config.connection_string.is_empty() {
                 ("sqlserver".to_string(), config.connection_string.clone())
             } else {
                 let data_dir = app
