@@ -344,7 +344,10 @@ public class ApiDeploymentService : IApiDeploymentService
         var server = deployment.ApplicationServer;
         var remoteBackupPath = $"{server.BackupPath}\\{deployment.BackupFileName}".Replace("\\\\", "\\");
         
-        var localBackupDir = Path.Combine(_configuration["FileUploadSettings:BackupPath"] ?? "Backups/ApiDeployments", deploymentId.ToString());
+        var localBackupBase = _configuration["FileUploadSettings:BackupPath"] ?? "Backups/ApiDeployments";
+        var localBackupDir = Path.IsPathRooted(localBackupBase)
+            ? Path.Combine(localBackupBase, "ApiDeployments", deploymentId.ToString())
+            : Path.Combine(Directory.GetCurrentDirectory(), localBackupBase, deploymentId.ToString());
         Directory.CreateDirectory(localBackupDir);
         
         var localBackupPath = Path.Combine(localBackupDir, deployment.BackupFileName);

@@ -112,15 +112,19 @@ pub fn run() {
         .setup(|app| {
             let config = load_config(app.handle());
 
+            // Always resolve the app data dir – we need it for SQLite *and* for the
+            // writable uploads/backups/logs directories on macOS (the .app bundle is
+            // read-only so we cannot write next to the binary or the resources).
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir");
+            fs::create_dir_all(&data_dir).ok();
+
             // Derive DB env vars from the loaded config
             let (db_provider, db_conn_str) = if config.db_mode == "sqlserver" && !config.connection_string.is_empty() {
                 ("sqlserver".to_string(), config.connection_string.clone())
             } else {
-                let data_dir = app
-                    .path()
-                    .app_data_dir()
-                    .expect("failed to resolve app data dir");
-                fs::create_dir_all(&data_dir).ok();
                 let sqlite_path = data_dir.join("deployvare.db");
                 (
                     "sqlite".to_string(),
@@ -142,6 +146,7 @@ pub fn run() {
                 .env("ASPNETCORE_ENVIRONMENT", "Production")
                 .env("ASPNETCORE_CONTENTROOT", resource_dir.to_string_lossy().as_ref())
                 .env("DOTNET_CONTENTROOT", resource_dir.to_string_lossy().as_ref())
+                .env("DEPLOYVARE_DATA_DIR", data_dir.to_string_lossy().as_ref())
                 .env("DB_PROVIDER", &db_provider)
                 .env("DB_CONNECTION_STRING", &db_conn_str);
 

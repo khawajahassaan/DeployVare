@@ -35,7 +35,11 @@ public class DeploymentsController : ControllerBase
         _storage = storage;
         
         var uploadPathConfig = configuration["FileUploadSettings:UploadPath"] ?? "wwwroot/uploads";
-        _uploadPath = Path.Combine(Directory.GetCurrentDirectory(), uploadPathConfig);
+        // Use the path as-is if absolute (set by Tauri wrapper to a writable data dir),
+        // otherwise resolve relative to CWD (dev / manual run).
+        _uploadPath = Path.IsPathRooted(uploadPathConfig)
+            ? uploadPathConfig
+            : Path.Combine(Directory.GetCurrentDirectory(), uploadPathConfig);
     }
 
     /// <summary>

@@ -10,17 +10,65 @@ using Serilog;
 // Disable automatic claim type mapping (prevents "sub" from overriding ClaimTypes.NameIdentifier)
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-var builder = WebApplication.CreateBuilder(args);
+// Resolve content root to find appsettings.json.
+// On macOS .app bundles the sidecar binary lives in Contents/MacOS/ but all bundled
+// resources (including appsettings.json) are placed in Contents/Resources/ by Tauri.
+// Tauri sets ASPNETCORE_CONTENTROOT / DOTNET_CONTENTROOT to that Resources path,
+// but for robustness (and for ad-hoc manual runs) we also auto-detect it.
+var contentRoot = Environment.GetEnvironmentVariable("ASPNETCORE_CONTENTROOT")
+    ?? Environment.GetEnvironmentVariable("DOTNET_CONTENTROOT");
+
+if (string.IsNullOrEmpty(contentRoot))
+{
+    var exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+    var macResourcesPath = Path.GetFullPath(Path.Combine(exeDir, "..", "Resources"));
+    if (Directory.Exists(macResourcesPath) && File.Exists(Path.Combine(macResourcesPath, "appsettings.json")))
+        contentRoot = macResourcesPath;
+    else
+        contentRoot = exeDir;
+}
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRoot
+});
+
+// Resolve a writable directory for log files.
+// Contents/Resources/ inside a signed .app bundle is read-only, so fall back to
+// the platform's local app-data directory when we cannot write next to the config.
+var logDir = Path.Combine(contentRoot, "logs");
+try { Directory.CreateDirectory(logDir); }
+catch
+{
+    logDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "DeployVare", "logs");
+    Directory.CreateDirectory(logDir);
+}
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File("logs/deployvare-.txt", rollingInterval: RollingInterval.Day)
+    .WriteTo.File(Path.Combine(logDir, "deployvare-.txt"), rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+// Override FileUploadSettings paths with absolute writable paths.
+// On macOS the .app bundle resources folder is read-only, so we use the
+// DEPLOYVARE_DATA_DIR env var (set by the Tauri wrapper to app_data_dir).
+// When running outside Tauri (dev, manual) we fall back to contentRoot/data.
+var dataDir = Environment.GetEnvironmentVariable("DEPLOYVARE_DATA_DIR")
+    ?? Path.Combine(contentRoot, "data");
+var uploadsDir = Path.Combine(dataDir, "uploads");
+var backupsDir = Path.Combine(dataDir, "backups");
+Directory.CreateDirectory(uploadsDir);
+Directory.CreateDirectory(backupsDir);
+builder.Configuration["FileUploadSettings:UploadPath"] = uploadsDir;
+builder.Configuration["FileUploadSettings:BackupPath"] = backupsDir;
 
 // Add services to the container
 builder.Services.AddControllers()

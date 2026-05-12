@@ -21,7 +21,11 @@ public class BackupService : IBackupService
         _storage = storage;
         
         var backupPath = configuration["FileUploadSettings:BackupPath"] ?? "wwwroot/backups";
-        _backupRootPath = Path.Combine(Directory.GetCurrentDirectory(), backupPath);
+        // Use the path as-is if absolute (set by Tauri wrapper to a writable data dir),
+        // otherwise resolve relative to CWD (dev / manual run).
+        _backupRootPath = Path.IsPathRooted(backupPath)
+            ? backupPath
+            : Path.Combine(Directory.GetCurrentDirectory(), backupPath);
         
         // Ensure backup directory exists
         Directory.CreateDirectory(_backupRootPath);
