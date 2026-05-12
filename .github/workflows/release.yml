@@ -95,6 +95,7 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:PublishTrimmed=false \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
             -o "API/publish-${{ matrix.platform }}"
 
           mkdir -p web/src-tauri/binaries

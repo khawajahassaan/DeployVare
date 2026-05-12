@@ -5,7 +5,7 @@
  */
 
 const isTauri = (): boolean =>
-  typeof window !== 'undefined' && '__TAURI__' in window;
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // ---------------------------------------------------------------------------
 // Config shape (must match AppConfig in src-tauri/src/lib.rs)
