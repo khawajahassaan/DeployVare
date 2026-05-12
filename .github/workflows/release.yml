@@ -169,6 +169,52 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build --target ${{ matrix.rust-target }}
 
+      # ── Re-sign macOS bundle with a complete ad-hoc signature ──
+      # Tauri v2 applies ad-hoc codesign to the main binary but NOT to bundled
+      # sidecar executables (e.g. the .NET api-server).  macOS finds nested
+      # unsigned executables inside a "signed" bundle and reports it as
+      # "damaged and can't be opened" — which is un-bypassable.
+      # --force --deep --sign - re-signs every binary in the tree so the bundle
+      # has a complete, valid (ad-hoc) signature.  This changes the Gatekeeper
+      # message from "damaged" (fatal) to "unidentified developer" (bypassable
+      # via right-click → Open or System Settings → Privacy & Security).
+      # This step only runs when APPLE_CERTIFICATE is absent; when a real
+      # Developer ID cert is present the normal signing + notarisation path
+      # already produces a bundle that passes Gatekeeper silently.
+      - name: Re-sign macOS app bundle (ad-hoc, no Apple certificate)
+        if: (matrix.platform == 'macos-intel' || matrix.platform == 'macos-arm') && env.APPLE_CERTIFICATE == ''
+        shell: bash
+        run: |
+          BUNDLE_DIR="web/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
+          APP_PATH=$(find "${BUNDLE_DIR}/macos" -name "*.app" -maxdepth 1 | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "WARNING: No .app found in ${BUNDLE_DIR}/macos – skipping"
+            exit 0
+          fi
+
+          echo "Ad-hoc signing (--deep): ${APP_PATH}"
+          codesign --force --deep --sign - "${APP_PATH}"
+          codesign --verify --deep "${APP_PATH}" && echo "✓ Signature OK"
+
+          # The DMG was already created by tauri build from the un-deep-signed app.
+          # Recreate it so users receive the correctly-signed bundle.
+          DMG_PATH=$(find "${BUNDLE_DIR}/dmg" -name "*.dmg" | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Repackaging DMG with corrected signature..."
+            STAGING_DIR=$(mktemp -d)
+            cp -R "${APP_PATH}" "${STAGING_DIR}/"
+            hdiutil create \
+              -volname "DeployVare" \
+              -srcfolder "${STAGING_DIR}" \
+              -ov \
+              -format UDZO \
+              "${RUNNER_TEMP}/deployvare-adhoc.dmg"
+            mv "${RUNNER_TEMP}/deployvare-adhoc.dmg" "${DMG_PATH}"
+            rm -rf "${STAGING_DIR}"
+            echo "✓ DMG repackaged: ${DMG_PATH}"
+          fi
+
       # ── Upload artifacts for each platform ──
       - name: Upload Linux .deb
         if: matrix.platform == 'linux-x64'
