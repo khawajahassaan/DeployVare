@@ -300,6 +300,8 @@ function Ensure-Bindings([object]$Cfg, [string]$Thumbprint) {
     $siteName = [string]$Cfg.websiteName
     $hostName = [string]$Cfg.siteHostName
     $requireSni = [bool]$Cfg.requireSni
+    $httpsPort = if ([int]$Cfg.httpsPort -gt 0) { [int]$Cfg.httpsPort } else { 443 }
+
     if (-not (Get-Website | Where-Object { $_.Name -eq $siteName })) { Fail "Site $siteName does not exist" }
     $cert = Get-Item -LiteralPath "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction SilentlyContinue
     if (-not $cert) { Fail "Certificate $Thumbprint was not found in LocalMachine\My" }
@@ -313,27 +315,27 @@ function Ensure-Bindings([object]$Cfg, [string]$Thumbprint) {
     }
 
     $sslFlags = if ($requireSni) { 1 } else { 0 }
-    $https = Get-WebBinding -Name $siteName -Protocol 'https' -Port 443 -HostHeader $hostName
+    $https = Get-WebBinding -Name $siteName -Protocol 'https' -Port $httpsPort -HostHeader $hostName
     if (-not $https) {
-        New-WebBinding -Name $siteName -Protocol 'https' -Port 443 -IPAddress '*' -HostHeader $hostName -SslFlags $sslFlags
-        $https = Get-WebBinding -Name $siteName -Protocol 'https' -Port 443 -HostHeader $hostName
-        Write-Step "Added binding https://${hostName}:443"
+        New-WebBinding -Name $siteName -Protocol 'https' -Port $httpsPort -IPAddress '*' -HostHeader $hostName -SslFlags $sslFlags
+        $https = Get-WebBinding -Name $siteName -Protocol 'https' -Port $httpsPort -HostHeader $hostName
+        Write-Step "Added binding https://${hostName}:${httpsPort}"
     } else {
-        Write-Step "Binding https://${hostName}:443 already exists"
+        Write-Step "Binding https://${hostName}:${httpsPort} already exists"
     }
 
-    $sslPath = if ($requireSni) { "IIS:\SslBindings\!443!$hostName" } else { 'IIS:\SslBindings\0.0.0.0!443' }
+    $sslPath = if ($requireSni) { "IIS:\SslBindings\!${httpsPort}!$hostName" } else { "IIS:\SslBindings\0.0.0.0!${httpsPort}" }
     $existing = Get-Item -Path $sslPath -ErrorAction SilentlyContinue
     if ($existing -and ($existing.Thumbprint -ne $Thumbprint)) {
         if (-not $requireSni) {
-            Fail "Port 443 is already bound to certificate $($existing.Thumbprint) for all sites without SNI. Enable Require SNI or choose that certificate."
+            Fail "Port $httpsPort is already bound to certificate $($existing.Thumbprint) for all sites without SNI. Enable Require SNI or choose that certificate."
         }
         Remove-Item -Path $sslPath -Force
         $existing = $null
     }
     if (-not $existing) {
         $https.AddSslCertificate($Thumbprint, 'My')
-        Write-Step "Bound certificate to https://${hostName}:443"
+        Write-Step "Bound certificate to https://${hostName}:${httpsPort}"
     }
 }
 
