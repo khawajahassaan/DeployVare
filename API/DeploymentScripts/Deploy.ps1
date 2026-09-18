@@ -442,12 +442,9 @@ function Restore-Database([object]$Cfg) {
         $null = $existsCmd.Parameters.AddWithValue('@database', $database)
         $exists = [int]$existsCmd.ExecuteScalar()
         if ($exists -eq 1) {
-            Write-Step "Database '$database' already exists. Dropping for fresh restore..."
-            $dropCmd = $master.CreateCommand()
-            $dropCmd.CommandTimeout = 300
-            $dropCmd.CommandText = 'ALTER DATABASE [' + $database.Replace(']', ']]') + '] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [' + $database.Replace(']', ']]') + ']'
-            $null = $dropCmd.ExecuteNonQuery()
-            Write-Step "[OK] Database dropped, will restore fresh"
+            Write-Step "Database '$database' already exists. Skipping restore, will run migrations instead..."
+            $master.Close()
+            return
         }
 
         $listCmd = $master.CreateCommand()
