@@ -680,8 +680,8 @@ function Install-Licence([object]$Cfg) {
 
 function Start-Site([object]$Cfg) {
     Import-Module WebAdministration
-    Start-WebAppPool -Name $Cfg.appPoolName
-    Start-Website -Name $Cfg.websiteName
+    Start-WebAppPool -Name $Cfg.appPoolName -ErrorAction SilentlyContinue
+    Start-Website -Name $Cfg.websiteName -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
     $poolStatus = (Get-WebAppPoolState -Name $Cfg.appPoolName).Value
     $siteStatus = (Get-Website -Name $Cfg.websiteName).State
