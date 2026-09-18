@@ -678,8 +678,26 @@ function Install-Licence([object]$Cfg) {
     return $true
 }
 
+function Ensure-HostsEntry([string]$HostName) {
+    if ($HostName -eq 'localhost' -or $HostName -like '127.0.0.1*' -or $HostName -like 'localhost*') { return }
+
+    $hostsFile = Join-Path $env:windir 'System32\drivers\etc\hosts'
+    $entry = "127.0.0.1`t$HostName"
+
+    try {
+        $content = @(Get-Content -LiteralPath $hostsFile -ErrorAction SilentlyContinue)
+        if (-not ($content | Where-Object { $_ -match "^\s*127\.0\.0\.1\s+$([regex]::Escape($HostName))\s*$" })) {
+            Add-Content -LiteralPath $hostsFile -Value $entry
+            Write-Step "[OK] Added hosts entry: $entry"
+        }
+    } catch {
+        Write-Step "WARNING: Could not update hosts file. Add manually: $entry"
+    }
+}
+
 function Start-Site([object]$Cfg) {
     Import-Module WebAdministration
+    Ensure-HostsEntry $Cfg.siteHostName
     try { Stop-Website -Name $Cfg.websiteName -ErrorAction Stop } catch { }
     Start-Sleep -Seconds 1
     try { Start-WebAppPool -Name $Cfg.appPoolName -ErrorAction Stop } catch { }
