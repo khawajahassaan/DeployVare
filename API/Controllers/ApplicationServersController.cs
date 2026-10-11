@@ -23,14 +23,14 @@ public class ApplicationServersController : ControllerBase
     }
 
     /// <summary>
-    /// Get all application servers
+    /// Get all application servers (optionally filtered by client)
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int? clientId = null)
     {
         try
         {
-            var servers = await _serverService.GetAllAsync();
+            var servers = await _serverService.GetAllAsync(clientId);
             return Ok(servers);
         }
         catch (Exception ex)
@@ -171,16 +171,11 @@ public class ApplicationServersController : ControllerBase
     {
         try
         {
-            var success = await _serverService.TestConnectionAsync(id);
-            
-            if (success)
-            {
-                return Ok(new { message = "Connection successful" });
-            }
-            else
-            {
-                return BadRequest(new { error = "Connection failed" });
-            }
+            var (success, message) = await _serverService.TestConnectionAsync(id);
+
+            return success
+                ? Ok(new { message })
+                : BadRequest(new { error = message });
         }
         catch (Exception ex)
         {

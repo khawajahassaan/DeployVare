@@ -52,6 +52,15 @@ public class ApplicationServer
 
     public ServerType ServerType { get; set; } = ServerType.Api;
 
+    // Frontend runtime settings written to config.js on deploy (JSON list of { key, value })
+    public string? RuntimeConfigJson { get; set; }
+
+    // Database this API uses; its app pool identity is granted access during Server Setup
+    public int? DatabaseInstanceId { get; set; }
+
+    [ForeignKey(nameof(DatabaseInstanceId))]
+    public DatabaseInstance? DatabaseInstance { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

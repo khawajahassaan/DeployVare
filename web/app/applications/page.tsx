@@ -2,18 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import api, { Application } from '@/lib/api';
 import { FolderKanban, Plus, Trash2, Database } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 
 export default function ApplicationsPage() {
+  const { clients, selectedClientId } = useClientStore();
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -22,12 +28,12 @@ export default function ApplicationsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadApplications();
-  }, []);
+    if (selectedClientId) loadApplications();
+  }, [selectedClientId]);
 
   const loadApplications = async () => {
     try {
-      const data = await api.getApplications();
+      const data = await api.getApplications(selectedClientId);
       setApplications(data);
     } catch (error) {
       console.error('Failed to load applications:', error);
@@ -42,7 +48,7 @@ export default function ApplicationsPage() {
     setCreating(true);
 
     try {
-      await api.createApplication(newApp);
+      await api.createApplication({ ...newApp, clientId: selectedClientId! });
       setIsCreateOpen(false);
       setNewApp({ name: '', description: '' });
       loadApplications();
@@ -64,47 +70,41 @@ export default function ApplicationsPage() {
     }
   };
 
+  const createButton = (
+    <Button onClick={() => setIsCreateOpen(true)}>
+      <Plus className="h-4 w-4" />
+      Create Application
+    </Button>
+  );
+
   return (
-    <ProtectedLayout>
+    <ProtectedLayout requireClient>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Applications</h1>
-            <p className="text-muted-foreground">Manage your applications and their database instances</p>
-          </div>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Application
-          </Button>
-        </div>
+        <PageHeader
+          title="Applications"
+          description={`Manage applications and their database instances${selectedClient ? ` for ${selectedClient.name}` : ''}`}
+          icon={FolderKanban}
+          actions={createButton}
+        />
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading applications...</p>
-          </div>
+          <LoadingState label="Loading applications..." />
         ) : applications.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FolderKanban className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Get started by creating your first application
-              </p>
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Application
-              </Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={FolderKanban}
+            title="No applications yet"
+            description="Get started by creating your first application"
+            action={createButton}
+          />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {applications.map((app) => (
-              <Card key={app.id} className="hover:shadow-lg transition-shadow">
+              <Card key={app.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      <FolderKanban className="h-5 w-5 text-primary" />
-                      <CardTitle>{app.name}</CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FolderKanban className="h-5 w-5 shrink-0 text-primary" />
+                      <CardTitle className="truncate">{app.name}</CardTitle>
                     </div>
                     <Button
                       variant="ghost"
@@ -123,7 +123,7 @@ export default function ApplicationsPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Instances</span>
                       <Badge variant="secondary">
-                        <Database className="mr-1 h-3 w-3" />
+                        <Database className="h-3 w-3" />
                         {app.instanceCount}
                       </Badge>
                     </div>
@@ -148,12 +148,12 @@ export default function ApplicationsPage() {
             <DialogHeader>
               <DialogTitle>Create New Application</DialogTitle>
               <DialogDescription>
-                Add a new application to manage its database instances
+                Add a new application for client <strong>{selectedClient?.name}</strong>
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
               {error && (
-                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
@@ -178,7 +178,7 @@ export default function ApplicationsPage() {
                   disabled={creating}
                 />
               </div>
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -198,7 +198,3 @@ export default function ApplicationsPage() {
     </ProtectedLayout>
   );
 }
-
-
-
-

@@ -69,8 +69,22 @@ export interface LoginResponse {
   expiresAt: string;
 }
 
+export interface Client {
+  id: number;
+  name: string;
+  clientCode: string;
+  licenseKey: string;
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  applicationCount: number;
+}
+
 export interface Application {
   id: number;
+  clientId: number;
+  clientName: string;
   name: string;
   description?: string;
   createdAt: string;
@@ -194,6 +208,14 @@ export interface ApiDeployment {
   version?: string;
   status: string;
   deploymentType: 'Api' | 'Frontend';
+  licensingMode: 'WithoutLicense' | 'WithLicense';
+  licenseId?: string;
+  artifactEnvironment?: string;
+  azureBuildId?: number;
+  azureBuildNumber?: string;
+  azureArtifactName?: string;
+  sourceBranch?: string;
+  sourceVersion?: string;
   backupFileName?: string;
   errorMessage?: string;
   deploymentDurationSeconds?: number;
@@ -210,6 +232,103 @@ export interface ApiDeploymentFile {
   uploadedAt: string;
 }
 
+export interface SigningKey {
+  exists: boolean;
+  keyId?: string | null;
+  algorithm?: string | null;
+  /** Public key to embed in the licensed application so it can verify signatures offline. */
+  publicKey?: string | null;
+  createdAt?: string | null;
+  createdBy?: string | null;
+  location: string;
+  protection?: string | null;
+}
+
+export interface LicenseActivation {
+  id: number;
+  machineFingerprint: string;
+  machineName?: string | null;
+  serverIdentity?: string | null;
+  status: string;
+  activatedAt: string;
+  deactivatedAt?: string | null;
+  lastIssuedAt?: string | null;
+  activatedBy: string;
+  deactivationReason?: string | null;
+}
+
+export interface License {
+  id: number;
+  clientId: number;
+  clientName: string;
+  customerId: string;
+  licenseId: string;
+  product: string;
+  status: string;
+  issuedAt: string;
+  expiresAt: string;
+  isExpired: boolean;
+  maxActivations: number;
+  features: string[];
+  notes?: string | null;
+  keyId: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  currentActivation?: LicenseActivation | null;
+  previousActivations: LicenseActivation[];
+  fileName: string;
+}
+
+export interface LicensingFile {
+  fileName: string;
+  content: string;
+}
+
+export interface ActivationReview {
+  canApprove: boolean;
+  outcome: string;
+  message: string;
+  licenseId: string;
+  product: string;
+  customerId: string;
+  clientName?: string | null;
+  machineFingerprint: string;
+  machineName: string;
+  serverIdentity?: string | null;
+  requestedAt: string;
+  licenseExpiresAt?: string | null;
+  currentActivation?: LicenseActivation | null;
+}
+
+export interface ActivationApproval {
+  review: ActivationReview;
+  responseFile: LicensingFile;
+  license: License;
+}
+
+export type DeploymentStageState = 'Pending' | 'Running' | 'Succeeded' | 'Warning' | 'Skipped' | 'Failed';
+
+export interface DeploymentStage {
+  key: string;
+  label: string;
+  state: DeploymentStageState;
+  detail?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface DeploymentProgress {
+  progressId: string;
+  deploymentId: number;
+  startedAt: string;
+  completedAt?: string | null;
+  isCompleted: boolean;
+  succeeded?: boolean | null;
+  errorMessage?: string | null;
+  stages: DeploymentStage[];
+}
+
 export interface ApiDeploymentResult {
   deploymentId: number;
   status: string;
@@ -221,6 +340,235 @@ export interface ApiDeploymentResult {
   startedAt: string;
   completedAt: string;
   deployedFiles: ApiDeploymentFile[];
+}
+
+// Azure DevOps Types
+export type ArtifactEnvironment = 'Dev' | 'UAT';
+
+export interface AzureDevOpsConnection {
+  id: number;
+  clientId: number;
+  organization: string;
+  project: string;
+  hasPersonalAccessToken: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  lastTestedAt?: string;
+  lastTestSucceeded?: boolean;
+}
+
+export interface AzureDevOpsTestResult {
+  success: boolean;
+  message: string;
+}
+
+export interface ArtifactSource {
+  id: number;
+  applicationId: number;
+  applicationName: string;
+  environment: ArtifactEnvironment;
+  serverType: 'Api' | 'Frontend';
+  repository: string;
+  branch: string;
+  pipelineDefinitionId?: number;
+  artifactName?: string;
+  artifactSubfolder?: string;
+  preserveWebConfig: boolean;
+  keepOnServerPaths?: string | null;
+  runDatabaseMigrations: boolean;
+  sqlScriptsArtifactName?: string | null;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+}
+
+export interface SaveArtifactSourceRequest {
+  applicationId: number;
+  environment: ArtifactEnvironment;
+  serverType: 'Api' | 'Frontend';
+  repository: string;
+  branch: string;
+  pipelineDefinitionId?: number | null;
+  artifactName?: string | null;
+  artifactSubfolder?: string | null;
+  preserveWebConfig: boolean;
+  keepOnServerPaths?: string | null;
+  runDatabaseMigrations: boolean;
+  sqlScriptsArtifactName?: string | null;
+}
+
+export interface AzureBuildArtifact {
+  name: string;
+  resourceType: string;
+  sizeBytes?: number;
+  isDownloadable: boolean;
+}
+
+export interface AzureBuild {
+  id: number;
+  buildNumber: string;
+  status: string;
+  result: string;
+  pipelineId: number;
+  pipelineName: string;
+  repository: string;
+  sourceBranch: string;
+  sourceVersion: string;
+  startTime?: string;
+  finishTime?: string;
+  requestedBy?: string;
+  webUrl?: string;
+  artifacts: AzureBuildArtifact[];
+}
+
+export interface LatestBuildResult {
+  source: ArtifactSource;
+  build: AzureBuild;
+  selectedArtifactName?: string;
+}
+
+// Server Setup Types
+export type ReadinessStatus = 'Pass' | 'Fail' | 'Warning' | 'Skipped';
+export type ServerComponent = 'HostingBundle' | 'DotNetSdk' | 'Redis' | 'UrlRewrite';
+export type ReadinessFix =
+  | 'InstallIis'
+  | 'CreateSite'
+  | 'InstallComponent'
+  | 'ConfigureCertificate'
+  | 'ConfigureBindings'
+  | 'UpdateDeploymentPath'
+  | 'ConfigureDatabase'
+  | 'GrantDatabaseAccess'
+  | 'ConfigureRuntimeSettings';
+
+export interface DatabaseAccess {
+  databaseInstanceId?: number | null;
+  instanceName?: string | null;
+  dataSource?: string | null;
+  databaseName?: string | null;
+  loginName: string;
+  configurationError?: string | null;
+  sqlOnSameServer?: boolean | null;
+  connected?: boolean | null;
+  connectionError?: string | null;
+  connectedAs?: string | null;
+  isSysadmin?: boolean | null;
+  databaseExists?: boolean | null;
+  loginExists?: boolean | null;
+  userExists?: boolean | null;
+  isDbOwner?: boolean | null;
+}
+
+export interface ReadinessItem {
+  key: string;
+  name: string;
+  status: ReadinessStatus;
+  detail: string;
+  required: boolean;
+  fix?: ReadinessFix | null;
+  component?: ServerComponent | null;
+  installerAvailable?: boolean | null;
+}
+
+export interface ServerCertificate {
+  thumbprint: string;
+  subject: string;
+  friendlyName?: string | null;
+  notAfter?: string | null;
+  isExpired: boolean;
+}
+
+export interface SiteBinding {
+  protocol: string;
+  bindingInformation: string;
+  hostName?: string | null;
+  port?: number | null;
+  certificateThumbprint?: string | null;
+}
+
+export interface ServerReadinessReport {
+  serverId: number;
+  serverName: string;
+  serverType: 'Api' | 'Frontend';
+  checkedAt: string;
+  checkedBy?: string | null;
+  isReady: boolean;
+  rebootPending: boolean;
+  operatingSystem?: string | null;
+  sitePhysicalPath?: string | null;
+  items: ReadinessItem[];
+  certificates: ServerCertificate[];
+  bindings: SiteBinding[];
+  database?: DatabaseAccess | null;
+}
+
+export interface InstallerFile {
+  component: ServerComponent;
+  fileName?: string | null;
+  version?: string | null;
+  sizeBytes?: number | null;
+  available: boolean;
+  pattern: string;
+  directory: string;
+}
+
+export interface SqlServerInstance {
+  name: string;
+  serviceName: string;
+  dataSource: string;
+  running: boolean;
+  version?: string | null;
+  edition?: string | null;
+  mixedAuthentication: boolean;
+  connected: boolean;
+  connectionError?: string | null;
+  connectedAs?: string | null;
+  canManageLogins: boolean;
+  databases: string[];
+}
+
+export interface SqlDatabaseUser {
+  userName: string;
+  userType: string;
+  loginName?: string | null;
+  loginDisabled: boolean;
+  loginLocked: boolean;
+  roles: string[];
+}
+
+/** How DeployVare connects to SQL Server. Never stored. */
+export interface SqlServerConnection {
+  useWindowsAuthentication: boolean;
+  adminLogin?: string;
+  adminPassword?: string;
+}
+
+export interface SqlServerInfo {
+  installed: boolean;
+  instances: SqlServerInstance[];
+}
+
+export interface RuntimeSetting {
+  key: string;
+  value: string;
+}
+
+export interface FrontendRuntimeConfig {
+  serverId: number;
+  serverType: 'Api' | 'Frontend';
+  settings: RuntimeSetting[];
+  standardKeys: string[];
+  suggestedKeys: string[];
+  configJsPreview?: string | null;
+}
+
+export interface ServerSetupActionResult {
+  success: boolean;
+  message: string;
+  rebootRequired: boolean;
+  steps: string[];
 }
 
 // User Management Types
@@ -266,9 +614,36 @@ export const api = {
     return response.data;
   },
 
+  // Clients
+  async getClients(): Promise<Client[]> {
+    const response = await apiClient.get<Client[]>('/clients');
+    return response.data;
+  },
+
+  async createClient(data: { name: string; clientCode: string }): Promise<Client> {
+    const response = await apiClient.post<Client>('/clients', data);
+    return response.data;
+  },
+
+  async updateClient(id: number, data: { name?: string; clientCode?: string; isActive?: boolean }): Promise<Client> {
+    const response = await apiClient.put<Client>(`/clients/${id}`, data);
+    return response.data;
+  },
+
+  async regenerateClientLicense(id: number): Promise<Client> {
+    const response = await apiClient.post<Client>(`/clients/${id}/regenerate-license`);
+    return response.data;
+  },
+
+  async deleteClient(id: number): Promise<void> {
+    await apiClient.delete(`/clients/${id}`);
+  },
+
   // Applications
-  async getApplications(): Promise<Application[]> {
-    const response = await apiClient.get<Application[]>('/applications');
+  async getApplications(clientId?: number | null): Promise<Application[]> {
+    const response = await apiClient.get<Application[]>('/applications', {
+      params: { clientId },
+    });
     return response.data;
   },
 
@@ -277,7 +652,7 @@ export const api = {
     return response.data;
   },
 
-  async createApplication(data: { name: string; description?: string }): Promise<Application> {
+  async createApplication(data: { clientId: number; name: string; description?: string }): Promise<Application> {
     const response = await apiClient.post<Application>('/applications', data);
     return response.data;
   },
@@ -287,8 +662,10 @@ export const api = {
   },
 
   // Database Instances
-  async getDatabaseInstances(): Promise<DatabaseInstance[]> {
-    const response = await apiClient.get<DatabaseInstance[]>('/databaseinstances');
+  async getDatabaseInstances(clientId?: number | null): Promise<DatabaseInstance[]> {
+    const response = await apiClient.get<DatabaseInstance[]>('/databaseinstances', {
+      params: { clientId },
+    });
     return response.data;
   },
 
@@ -324,7 +701,7 @@ export const api = {
   },
 
   // Deployments
-  async getDeployments(page = 1, pageSize = 20): Promise<{
+  async getDeployments(page = 1, pageSize = 20, clientId?: number | null): Promise<{
     data: Deployment[];
     page: number;
     pageSize: number;
@@ -332,7 +709,7 @@ export const api = {
     totalPages: number;
   }> {
     const response = await apiClient.get('/deployments', {
-      params: { page, pageSize },
+      params: { page, pageSize, clientId },
     });
     return response.data;
   },
@@ -374,6 +751,23 @@ export const api = {
     return response.data;
   },
 
+  async compareWithSnap(
+    sourceInstanceId: number | null,
+    sourceFile: File | null,
+    targetInstanceId: number | null,
+    targetFile: File | null
+  ): Promise<SchemaComparison> {
+    const form = new FormData();
+    if (sourceFile) form.append('sourceFile', sourceFile);
+    if (targetFile) form.append('targetFile', targetFile);
+    if (sourceInstanceId) form.append('sourceInstanceId', String(sourceInstanceId));
+    if (targetInstanceId) form.append('targetInstanceId', String(targetInstanceId));
+    const response = await apiClient.post<SchemaComparison>('/schemacomparison/compare-with-snap', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   async getProcedureDetail(
     sourceInstanceId: number,
     targetInstanceId: number,
@@ -406,8 +800,10 @@ export const api = {
   },
 
   // Application Servers
-  async getApplicationServers(): Promise<ApplicationServer[]> {
-    const response = await apiClient.get<ApplicationServer[]>('/applicationservers');
+  async getApplicationServers(clientId?: number | null): Promise<ApplicationServer[]> {
+    const response = await apiClient.get<ApplicationServer[]>('/applicationservers', {
+      params: { clientId },
+    });
     return response.data;
   },
 
@@ -510,6 +906,313 @@ export const api = {
     }
     formData.append('zipFile', zipFile);
     const response = await apiClient.post<ApiDeploymentResult>('/apideployments/frontend', formData);
+    return response.data;
+  },
+
+  // Azure DevOps
+  async getAzureDevOpsConnection(clientId: number): Promise<AzureDevOpsConnection | null> {
+    const response = await apiClient.get<AzureDevOpsConnection | ''>('/azuredevops/connection', {
+      params: { clientId },
+    });
+    return response.data || null;
+  },
+
+  async saveAzureDevOpsConnection(data: {
+    clientId: number;
+    organization: string;
+    project: string;
+    personalAccessToken?: string;
+  }): Promise<AzureDevOpsConnection> {
+    const response = await apiClient.put<AzureDevOpsConnection>('/azuredevops/connection', data);
+    return response.data;
+  },
+
+  async deleteAzureDevOpsConnection(clientId: number): Promise<void> {
+    await apiClient.delete(`/azuredevops/connection/${clientId}`);
+  },
+
+  async testAzureDevOpsConnection(data: {
+    clientId: number;
+    organization?: string;
+    project?: string;
+    personalAccessToken?: string;
+  }): Promise<AzureDevOpsTestResult> {
+    const response = await apiClient.post<AzureDevOpsTestResult>('/azuredevops/connection/test', data);
+    return response.data;
+  },
+
+  async getArtifactSources(clientId: number): Promise<ArtifactSource[]> {
+    const response = await apiClient.get<ArtifactSource[]>('/azuredevops/artifact-sources', {
+      params: { clientId },
+    });
+    return response.data;
+  },
+
+  async createArtifactSource(data: SaveArtifactSourceRequest): Promise<ArtifactSource> {
+    const response = await apiClient.post<ArtifactSource>('/azuredevops/artifact-sources', data);
+    return response.data;
+  },
+
+  async updateArtifactSource(id: number, data: SaveArtifactSourceRequest): Promise<ArtifactSource> {
+    const response = await apiClient.put<ArtifactSource>(`/azuredevops/artifact-sources/${id}`, data);
+    return response.data;
+  },
+
+  async deleteArtifactSource(id: number): Promise<void> {
+    await apiClient.delete(`/azuredevops/artifact-sources/${id}`);
+  },
+
+  async testArtifactSource(id: number): Promise<AzureDevOpsTestResult> {
+    const response = await apiClient.post<AzureDevOpsTestResult>(`/azuredevops/artifact-sources/${id}/test`);
+    return response.data;
+  },
+
+  async getLatestAzureBuild(applicationServerId: number, environment: ArtifactEnvironment): Promise<LatestBuildResult> {
+    const response = await apiClient.get<LatestBuildResult>('/azuredevops/latest-build', {
+      params: { applicationServerId, environment },
+    });
+    return response.data;
+  },
+
+  async deployAzureArtifact(data: {
+    applicationServerId: number;
+    environment: ArtifactEnvironment;
+    buildId: number;
+    artifactName: string;
+    version?: string;
+    progressId?: string;
+    // Omitted means WithoutLicense on the server, so an older caller deploys exactly as before
+    licensingMode?: 'WithoutLicense' | 'WithLicense';
+    licenseId?: number;
+  }): Promise<ApiDeploymentResult> {
+    const response = await apiClient.post<ApiDeploymentResult>('/apideployments/azure-artifact', data);
+    return response.data;
+  },
+
+  // Licensing (only an installation holding the signing key can issue or approve)
+  async getSigningKey(): Promise<SigningKey> {
+    const response = await apiClient.get<SigningKey>('/licensing/signing-key');
+    return response.data;
+  },
+
+  async createSigningKey(): Promise<SigningKey> {
+    const response = await apiClient.post<SigningKey>('/licensing/signing-key');
+    return response.data;
+  },
+
+  async getLicenses(clientId?: number | null): Promise<License[]> {
+    const response = await apiClient.get<License[]>('/licensing/licenses', { params: { clientId } });
+    return response.data;
+  },
+
+  async issueLicense(data: {
+    clientId: number;
+    product?: string;
+    licenseId?: string;
+    expiresAt?: string;
+    features?: string[];
+    maxActivations?: number;
+    notes?: string;
+  }): Promise<License> {
+    const response = await apiClient.post<License>('/licensing/licenses', data);
+    return response.data;
+  },
+
+  async getLicenseFile(id: number): Promise<LicensingFile> {
+    const response = await apiClient.get<LicensingFile>(`/licensing/licenses/${id}/file`);
+    return response.data;
+  },
+
+  async renewLicense(id: number, expiresAt: string, reason?: string): Promise<License> {
+    const response = await apiClient.post<License>(`/licensing/licenses/${id}/renew`, { expiresAt, reason });
+    return response.data;
+  },
+
+  /** Checks an activation request file without changing anything. */
+  async reviewActivation(requestFile: string): Promise<ActivationReview> {
+    const response = await apiClient.post<ActivationReview>('/licensing/activations/review', { requestFile });
+    return response.data;
+  },
+
+  /** Binds the licence to the requesting machine and returns the response file to send back. */
+  async approveActivation(requestFile: string): Promise<ActivationApproval> {
+    const response = await apiClient.post<ActivationApproval>('/licensing/activations/approve', { requestFile });
+    return response.data;
+  },
+
+  async transferLicense(id: number, reason?: string): Promise<License> {
+    const response = await apiClient.post<License>(`/licensing/licenses/${id}/transfer`, { reason });
+    return response.data;
+  },
+
+  async revokeLicense(id: number, reason?: string): Promise<License> {
+    const response = await apiClient.post<License>(`/licensing/licenses/${id}/revoke`, { reason });
+    return response.data;
+  },
+
+  async downloadDeploymentPackage(data: {
+    applicationServerId: number;
+    environment: ArtifactEnvironment;
+    buildId: number;
+    artifactName: string;
+    licensingMode?: 'WithoutLicense' | 'WithLicense';
+    licenseId?: number;
+    freshDatabase?: boolean;
+    certificateMode?: 'Default' | 'UserProvided';
+    siteHostName?: string;
+    sqlInstanceName?: string;
+    databaseName?: string;
+    certificateFile?: File | null;
+    combined?: boolean;
+    counterpartServerId?: number;
+    counterpartSiteHostName?: string;
+  }): Promise<{ blob: Blob; fileName: string }> {
+    const form = new FormData();
+    form.append('applicationServerId', String(data.applicationServerId));
+    form.append('environment', data.environment);
+    form.append('buildId', String(data.buildId));
+    form.append('artifactName', data.artifactName);
+    form.append('licensingMode', data.licensingMode ?? 'WithoutLicense');
+    if (data.licenseId) form.append('licenseId', String(data.licenseId));
+    form.append('freshDatabase', data.freshDatabase ? 'true' : 'false');
+    form.append('certificateMode', data.certificateMode ?? 'Default');
+    if (data.siteHostName) form.append('siteHostName', data.siteHostName);
+    if (data.sqlInstanceName) form.append('sqlInstanceName', data.sqlInstanceName);
+    if (data.databaseName) form.append('databaseName', data.databaseName);
+    if (data.certificateFile) form.append('certificateFile', data.certificateFile);
+    form.append('combined', data.combined ? 'true' : 'false');
+    if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
+    if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
+    const response = await apiClient.post('/apideployments/azure-artifact/package', form, { responseType: 'blob' });
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    return { blob: response.data as Blob, fileName: match ? decodeURIComponent(match[1]) : 'manual-deploy.zip' };
+  },
+
+  /** Live progress of an Azure DevOps deployment, or null until the API has started tracking it. */
+  async getDeploymentProgress(progressId: string): Promise<DeploymentProgress | null> {
+    const response = await apiClient.get<DeploymentProgress | ''>(`/apideployments/progress/${encodeURIComponent(progressId)}`);
+    return response.data || null;
+  },
+
+  // Server Setup
+  /** Latest saved readiness report, or null when the server has never been checked. */
+  async getServerReadiness(serverId: number): Promise<ServerReadinessReport | null> {
+    const response = await apiClient.get<ServerReadinessReport | ''>(`/serversetup/${serverId}/readiness`);
+    return response.data || null;
+  },
+
+  /** Runs the readiness check on the server and saves the result. */
+  async runServerReadinessCheck(serverId: number): Promise<ServerReadinessReport> {
+    const response = await apiClient.post<ServerReadinessReport>(`/serversetup/${serverId}/readiness`);
+    return response.data;
+  },
+
+  async getServerInstallers(): Promise<InstallerFile[]> {
+    const response = await apiClient.get<InstallerFile[]>('/serversetup/installers');
+    return response.data;
+  },
+
+  async installIis(serverId: number): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/install-iis`);
+    return response.data;
+  },
+
+  async installServerComponent(serverId: number, component: ServerComponent): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/install-component`, { component });
+    return response.data;
+  },
+
+  async createServerSite(serverId: number, data: {
+    physicalPath: string;
+    hostName: string;
+    useAsDeploymentPath: boolean;
+  }): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/create-site`, data);
+    return response.data;
+  },
+
+  async installServerCertificate(serverId: number, certificateFile: File, password?: string): Promise<ServerSetupActionResult> {
+    const formData = new FormData();
+    formData.append('certificateFile', certificateFile);
+    if (password) {
+      formData.append('password', password);
+    }
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/certificates`, formData);
+    return response.data;
+  },
+
+  async configureServerBindings(serverId: number, data: {
+    hostName: string;
+    certificateThumbprint: string;
+    requireSni: boolean;
+  }): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/bindings`, data);
+    return response.data;
+  },
+
+  async linkServerDatabaseInstance(serverId: number, databaseInstanceId: number | null): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/database-instance`, {
+      databaseInstanceId,
+    });
+    return response.data;
+  },
+
+  async grantServerDatabaseAccess(serverId: number): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/grant-database-access`);
+    return response.data;
+  },
+
+  /** Without a connection only detects instances; with one, also connects and lists databases. */
+  async checkServerSqlServer(serverId: number, connection: SqlServerConnection | null): Promise<SqlServerInfo> {
+    const response = await apiClient.post<SqlServerInfo>(`/serversetup/${serverId}/sql-server/check`, connection ?? {});
+    return response.data;
+  },
+
+  async getServerSqlDatabaseUsers(serverId: number, data: SqlServerConnection & {
+    instanceName: string;
+    databaseName: string;
+  }): Promise<SqlDatabaseUser[]> {
+    const response = await apiClient.post<SqlDatabaseUser[]>(`/serversetup/${serverId}/sql-server/database-users`, data);
+    return response.data;
+  },
+
+  async createServerSqlLogin(serverId: number, data: SqlServerConnection & {
+    instanceName: string;
+    databaseName: string;
+    loginName: string;
+    password: string;
+    resetPasswordIfExists: boolean;
+  }): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/sql-server/logins`, data);
+    return response.data;
+  },
+
+  async enableServerSqlAuthentication(serverId: number, instanceName: string): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(
+      `/serversetup/${serverId}/sql-server/enable-sql-authentication`,
+      { instanceName }
+    );
+    return response.data;
+  },
+
+  async getServerRuntimeConfig(serverId: number): Promise<FrontendRuntimeConfig> {
+    const response = await apiClient.get<FrontendRuntimeConfig>(`/serversetup/${serverId}/runtime-config`);
+    return response.data;
+  },
+
+  async saveServerRuntimeConfig(serverId: number, settings: RuntimeSetting[]): Promise<FrontendRuntimeConfig> {
+    const response = await apiClient.put<FrontendRuntimeConfig>(`/serversetup/${serverId}/runtime-config`, { settings });
+    return response.data;
+  },
+
+  async applyServerRuntimeConfig(serverId: number): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/runtime-config/apply`);
+    return response.data;
+  },
+
+  async syncServerDeploymentPath(serverId: number): Promise<ServerSetupActionResult> {
+    const response = await apiClient.post<ServerSetupActionResult>(`/serversetup/${serverId}/sync-deployment-path`);
     return response.data;
   },
 

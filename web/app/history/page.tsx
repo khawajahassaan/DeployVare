@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import api, { Deployment, DeploymentPatch, DeploymentObject } from '@/lib/api';
-import { CheckCircle, XCircle, Clock, Download, FileText, Database, FunctionSquare } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Download, FileText, Database, FunctionSquare, History } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function HistoryPage() {
+  const { selectedClientId } = useClientStore();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [selectedDeployment, setSelectedDeployment] = useState<Deployment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,12 +25,12 @@ export default function HistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    loadDeployments();
-  }, [page]);
+    if (selectedClientId) loadDeployments();
+  }, [page, selectedClientId]);
 
   const loadDeployments = async () => {
     try {
-      const result = await api.getDeployments(page, 20);
+      const result = await api.getDeployments(page, 20, selectedClientId);
       setDeployments(result.data);
       setTotalPages(result.totalPages);
     } catch (error) {
@@ -65,38 +70,33 @@ export default function HistoryPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Success':
-        return <Badge variant="success"><CheckCircle className="mr-1 h-3 w-3" />Success</Badge>;
+        return <Badge variant="success"><CheckCircle className="h-3 w-3" />Success</Badge>;
       case 'Failed':
-        return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Failed</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3" />Failed</Badge>;
       case 'InProgress':
-        return <Badge variant="warning"><Clock className="mr-1 h-3 w-3" />In Progress</Badge>;
+        return <Badge variant="warning"><Clock className="h-3 w-3" />In Progress</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
 
   return (
-    <ProtectedLayout>
+    <ProtectedLayout requireClient>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Deployment History</h1>
-          <p className="text-muted-foreground">View and manage past deployments</p>
-        </div>
+        <PageHeader
+          title="Deployment History"
+          description="View and manage past deployments"
+          icon={History}
+        />
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading deployment history...</p>
-          </div>
+          <LoadingState label="Loading deployment history..." />
         ) : deployments.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No deployments yet</h3>
-              <p className="text-muted-foreground">
-                Your deployment history will appear here
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Clock}
+            title="No deployments yet"
+            description="Your deployment history will appear here"
+          />
         ) : (
           <>
             <Card>
@@ -107,15 +107,15 @@ export default function HistoryPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="divide-y divide-border">
                   {deployments.map((deployment) => (
                     <div
                       key={deployment.id}
-                      className="flex items-center justify-between pb-4 cursor-pointer hover:bg-muted/50 p-3 rounded-lg transition-colors hover:shadow-sm"
+                      className="flex cursor-pointer items-center justify-between gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-muted/40"
                       onClick={() => loadDeploymentDetails(deployment.id)}
                     >
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium">
                             {deployment.applicationName} - {deployment.instanceName}
                           </p>
@@ -124,7 +124,7 @@ export default function HistoryPage() {
                         <p className="text-sm text-muted-foreground">
                           Patches {deployment.fromPatchNumber} → {deployment.toPatchNumber}
                         </p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span>Deployed by {deployment.deployedBy}</span>
                           <span>{formatDate(deployment.deployedAt)}</span>
                           {deployment.durationSeconds && (
@@ -146,7 +146,7 @@ export default function HistoryPage() {
                             handleDownloadBackup(deployment.id);
                           }}
                         >
-                          <Download className="mr-2 h-3 w-3" />
+                          <Download className="h-3 w-3" />
                           Backup
                         </Button>
                       )}
@@ -191,7 +191,7 @@ export default function HistoryPage() {
                 </DialogHeader>
                 <div className="space-y-6">
                   {/* Summary */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Application:</span>
                       <p className="font-medium">{selectedDeployment.applicationName}</p>
@@ -223,7 +223,7 @@ export default function HistoryPage() {
                   {/* Patches */}
                   {selectedDeployment.patches && selectedDeployment.patches.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
                         <FileText className="h-4 w-4" />
                         SQL Patches ({selectedDeployment.patches.length})
                       </h3>
@@ -231,7 +231,7 @@ export default function HistoryPage() {
                         {selectedDeployment.patches.map((patch: DeploymentPatch, idx: number) => (
                           <div
                             key={idx}
-                            className="flex items-start justify-between p-3 rounded-lg border"
+                            className="flex items-start justify-between rounded-lg border border-border p-3"
                           >
                             <div className="flex-1">
                               <p className="font-medium text-sm">
@@ -244,7 +244,7 @@ export default function HistoryPage() {
                               )}
                             </div>
                             {patch.status === 'Success' ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <CheckCircle className="h-4 w-4 text-green-600" />
                             ) : (
                               <XCircle className="h-4 w-4 text-destructive" />
                             )}
@@ -257,13 +257,13 @@ export default function HistoryPage() {
                   {/* Objects (Procedures/Functions) */}
                   {selectedDeployment.objects && selectedDeployment.objects.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
                         <Database className="h-4 w-4" />
                         Database Objects ({selectedDeployment.objects.length})
                       </h3>
                       <div className="grid gap-2">
                         {selectedDeployment.objects.map((obj: DeploymentObject, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between p-3 rounded-lg border">
+                          <div key={idx} className="flex items-center justify-between rounded-lg border border-border p-3">
                             <div className="flex items-center gap-2">
                               {obj.objectType.includes('Procedure') ? (
                                 <Database className="h-4 w-4 text-primary" />
@@ -288,9 +288,9 @@ export default function HistoryPage() {
 
                   {/* Error Message */}
                   {selectedDeployment.errorMessage && (
-                    <div className="rounded-lg ring-1 ring-red-200 p-4 bg-red-50 shadow-sm">
-                      <p className="font-semibold text-sm text-destructive mb-2">Error:</p>
-                      <p className="text-sm text-destructive">{selectedDeployment.errorMessage}</p>
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      <p className="font-semibold mb-1">Error:</p>
+                      <p>{selectedDeployment.errorMessage}</p>
                     </div>
                   )}
 
@@ -300,7 +300,7 @@ export default function HistoryPage() {
                       onClick={() => handleDownloadBackup(selectedDeployment.id)}
                       className="w-full"
                     >
-                      <Download className="mr-2 h-4 w-4" />
+                      <Download className="h-4 w-4" />
                       Download Backup
                     </Button>
                   )}
@@ -313,4 +313,3 @@ export default function HistoryPage() {
     </ProtectedLayout>
   );
 }
-

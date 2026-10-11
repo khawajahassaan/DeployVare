@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # .NET 8 API Server (self-contained, no framework dependency)
+  api:
+    build:
+      context: .
+      dockerfile: Docker/api/Dockerfile.linux
+    container_name: deployvare-api
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
+      DB_PROVIDER: sqlserver
+      DB_CONNECTION_STRING: ${DB_CONNECTION_STRING:-Server=sql-server;Database=DeployVare;Integrated Security=true;TrustServerCertificate=true}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-ChangeMe_SuperSecretKeyWith32CharactersMinimum123}
+      JWT_ISSUER: ${JWT_ISSUER:-DeployVare}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-DeployVare}
+      DEPLOYVARE_DATA_DIR: /data
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+    volumes:
+      # Persistent storage for uploads, backups, logs, licenses
+      - deployvare_data:/data
+      - deployvare_logs:/var/log/deployvare
+    networks:
+      - deployvare-net
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # Redis cache (7.x)
+  redis:
+    image: redis:7-alpine
+    container_name: deployvare-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - deployvare-net
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: deployvare-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Docker/nginx/ssl:/etc/nginx/ssl:ro
+      - deployvare_cache:/var/cache/nginx
+    networks:
+      - deployvare-net
+    depends_on:
+      - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # SQL Server (optional; use external SQL Server for production)
+  # Uncomment to run SQL Server in Docker; for production, use managed SQL Server
+  # sql-server:
+  #   image: mcr.microsoft.com/mssql/server:2022-latest
+  #   container_name: deployvare-sql
+  #   restart: always
+  #   ports:
+  #     - "1433:1433"
+  #   environment:
+  #     SA_PASSWORD: ${SA_PASSWORD:-ChangeMe123!}
+  #     ACCEPT_EULA: Y
+  #   volumes:
+  #     - sql_data:/var/opt/mssql
+  #   networks:
+  #     - deployvare-net
+
+volumes:
+  deployvare_data:
+    driver: local
+  deployvare_logs:
+    driver: local
+  deployvare_cache:
+    driver: local
+  redis_data:
+    driver: local
+  # sql_data:
+  #   driver: local
+
+networks:
+  deployvare-net:
+    driver: bridge

@@ -6,8 +6,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "DeployVare - SQL Deployment Manager",
-  description: "Manage SQL deployments across multiple applications and instances",
+  title: "DeployVare",
+  description: "Client onboarding, server setup and deployments for SQL databases and IIS applications",
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         {children}
         <Toaster position="top-right" richColors />

@@ -17,7 +17,13 @@ public enum Permission
     // API Deployment
     ManageServers,
     DeployApi,
-    ViewApiHistory
+    ViewApiHistory,
+
+    // Client Onboarding
+    ManageClients,
+
+    // Azure DevOps integration
+    ManageAzureDevOps
 }
 
 

@@ -13,6 +13,14 @@ public class ApiDeploymentDto
     public string? Version { get; set; }
     public ApiDeploymentStatus Status { get; set; }
     public string DeploymentType { get; set; } = "Api";
+    public string LicensingMode { get; set; } = "WithoutLicense";
+    public string? LicenseId { get; set; }
+    public string? ArtifactEnvironment { get; set; }
+    public int? AzureBuildId { get; set; }
+    public string? AzureBuildNumber { get; set; }
+    public string? AzureArtifactName { get; set; }
+    public string? SourceBranch { get; set; }
+    public string? SourceVersion { get; set; }
     public string? BackupFileName { get; set; }
     public string? ErrorMessage { get; set; }
     public int? DeploymentDurationSeconds { get; set; }

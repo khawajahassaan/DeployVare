@@ -20,14 +20,14 @@ public class ApplicationsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all applications
+    /// Get all applications (optionally filtered by client)
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int? clientId = null)
     {
         try
         {
-            var applications = await _applicationService.GetAllApplicationsAsync();
+            var applications = await _applicationService.GetAllApplicationsAsync(clientId);
             return Ok(applications);
         }
         catch (Exception ex)

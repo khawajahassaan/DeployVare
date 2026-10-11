@@ -739,5 +739,127 @@ public class SchemaComparisonService : ISchemaComparisonService
             };
         }
     }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // .dbsnap comparison
+    // ────────────────────────────────────────────────────────────────────────────
+
+    public async Task<SchemaComparisonDto> CompareWithSnapAsync(
+        Stream? sourceSnapStream, string sourceSnapLabel,
+        Stream? targetSnapStream, string targetSnapLabel,
+        int? sourceInstanceId, int? targetInstanceId)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "CompareWithSnap: source={SrcLabel}/{SrcId}, target={TgtLabel}/{TgtId}",
+                sourceSnapLabel, sourceInstanceId, targetSnapLabel, targetInstanceId);
+
+            // ── Resolve SOURCE schema ──────────────────────────────────────────
+            List<TableInfo> sourceTables;
+            List<StoredProcedureInfo> sourceProcedures;
+            List<FunctionInfo> sourceFunctions;
+            DatabaseSchemaInfo sourceInfo;
+
+            if (sourceSnapStream is not null)
+            {
+                var snap = await DbSnapReader.ReadAsync(sourceSnapStream);
+                sourceTables = snap.Tables;
+                sourceProcedures = snap.Procedures;
+                sourceFunctions = snap.Functions;
+                sourceInfo = new DatabaseSchemaInfo
+                {
+                    InstanceName = snap.DatabaseName,
+                    ApplicationName = "Snapshot",
+                    CurrentPatchNumber = 0
+                };
+            }
+            else
+            {
+                var inst = await _context.DatabaseInstances
+                    .Include(d => d.Application)
+                    .FirstOrDefaultAsync(d => d.Id == sourceInstanceId)
+                    ?? throw new Exception($"Source instance {sourceInstanceId} not found");
+                var cs = _encryptionService.Decrypt(inst.ConnectionStringEncrypted);
+                sourceTables = await _sqlExecutionService.GetTablesAsync(cs);
+                sourceProcedures = await _sqlExecutionService.GetStoredProceduresAsync(cs);
+                sourceFunctions = await _sqlExecutionService.GetFunctionsAsync(cs);
+                sourceInfo = new DatabaseSchemaInfo
+                {
+                    InstanceName = inst.InstanceName,
+                    ApplicationName = inst.Application.Name,
+                    CurrentPatchNumber = inst.CurrentPatchNumber
+                };
+            }
+
+            // ── Resolve TARGET schema ──────────────────────────────────────────
+            List<TableInfo> targetTables;
+            List<StoredProcedureInfo> targetProcedures;
+            List<FunctionInfo> targetFunctions;
+            DatabaseSchemaInfo targetInfo;
+
+            if (targetSnapStream is not null)
+            {
+                var snap = await DbSnapReader.ReadAsync(targetSnapStream);
+                targetTables = snap.Tables;
+                targetProcedures = snap.Procedures;
+                targetFunctions = snap.Functions;
+                targetInfo = new DatabaseSchemaInfo
+                {
+                    InstanceName = snap.DatabaseName,
+                    ApplicationName = "Snapshot",
+                    CurrentPatchNumber = 0
+                };
+            }
+            else
+            {
+                var inst = await _context.DatabaseInstances
+                    .Include(d => d.Application)
+                    .FirstOrDefaultAsync(d => d.Id == targetInstanceId)
+                    ?? throw new Exception($"Target instance {targetInstanceId} not found");
+                var cs = _encryptionService.Decrypt(inst.ConnectionStringEncrypted);
+                targetTables = await _sqlExecutionService.GetTablesAsync(cs);
+                targetProcedures = await _sqlExecutionService.GetStoredProceduresAsync(cs);
+                targetFunctions = await _sqlExecutionService.GetFunctionsAsync(cs);
+                targetInfo = new DatabaseSchemaInfo
+                {
+                    InstanceName = inst.InstanceName,
+                    ApplicationName = inst.Application.Name,
+                    CurrentPatchNumber = inst.CurrentPatchNumber
+                };
+            }
+
+            // ── Compare ────────────────────────────────────────────────────────
+            var tableDiffs = CompareTables(sourceTables, targetTables);
+            var procedureDiffs = CompareProcedures(sourceProcedures, targetProcedures);
+            var functionDiffs = CompareFunctions(sourceFunctions, targetFunctions);
+
+            // Since both sides are in memory, generate real inline diffs for modified objects
+            // (in a live DB-to-DB comparison these are lazy-loaded; here we have the data already).
+            foreach (var diff in procedureDiffs.Where(d => d.DiffType == "Modified"))
+                diff.Changes = GenerateLimitedDiff(diff.TargetDefinition, diff.SourceDefinition, 200);
+
+            foreach (var diff in functionDiffs.Where(d => d.DiffType == "Modified"))
+                diff.Changes = GenerateLimitedDiff(diff.TargetDefinition, diff.SourceDefinition, 200);
+
+            _logger.LogInformation(
+                "CompareWithSnap done: {T} table diffs, {P} proc diffs, {F} func diffs",
+                tableDiffs.Count, procedureDiffs.Count, functionDiffs.Count);
+
+            return new SchemaComparisonDto
+            {
+                Source = sourceInfo,
+                Target = targetInfo,
+                TableDifferences = tableDiffs,
+                ProcedureDifferences = procedureDiffs,
+                FunctionDifferences = functionDiffs
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CompareWithSnap failed");
+            throw;
+        }
+    }
 }
 

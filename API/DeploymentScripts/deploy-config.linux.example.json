@@ -1,0 +1,18 @@
+{
+  "$schema": "DeployVare deployment configuration for Linux (Ubuntu/Debian)",
+  "serverName": "production-api",
+  "serverType": "Api",
+  "webServer": "nginx",
+  "deploymentPath": "/var/www/deployvare-api",
+  "siteName": "deployvare-api",
+  "siteHostName": "api.example.com",
+  "httpsPort": 443,
+  "certificateFile": "certificate/api.example.com.crt",
+  "certificateKeyFile": "certificate/api.example.com.key",
+  "sqlDataSource": "mssql-server.example.com",
+  "databaseName": "DeployVare",
+  "freshDatabase": false,
+  "requiredDotNetMajor": 8,
+  "requiredRedisMajor": 7,
+  "redisPort": 6379
+}

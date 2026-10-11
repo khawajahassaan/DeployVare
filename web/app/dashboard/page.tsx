@@ -2,30 +2,36 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import api, { Application, DatabaseInstance, Deployment } from '@/lib/api';
-import { FolderKanban, Database, Rocket, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { FolderKanban, Database, Rocket, CheckCircle, XCircle, Clock, Home } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
+  const { clients, selectedClientId } = useClientStore();
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
   const [applications, setApplications] = useState<Application[]>([]);
   const [instances, setInstances] = useState<DatabaseInstance[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (selectedClientId) loadData();
+  }, [selectedClientId]);
 
   const loadData = async () => {
     try {
       const [apps, insts, deploys] = await Promise.all([
-        api.getApplications(),
-        api.getDatabaseInstances(),
-        api.getDeployments(1, 5),
+        api.getApplications(selectedClientId),
+        api.getDatabaseInstances(selectedClientId),
+        api.getDeployments(1, 5, selectedClientId),
       ]);
       setApplications(apps);
       setInstances(insts);
@@ -40,62 +46,53 @@ export default function DashboardPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Success':
-        return <Badge variant="success"><CheckCircle className="mr-1 h-3 w-3" />Success</Badge>;
+        return <Badge variant="success"><CheckCircle className="h-3 w-3" />Success</Badge>;
       case 'Failed':
-        return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Failed</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3" />Failed</Badge>;
       case 'InProgress':
-        return <Badge variant="warning"><Clock className="mr-1 h-3 w-3" />In Progress</Badge>;
+        return <Badge variant="warning"><Clock className="h-3 w-3" />In Progress</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
 
+  const stats = [
+    { title: 'Applications', value: applications.length, caption: 'Total applications', icon: FolderKanban },
+    { title: 'Database Instances', value: instances.length, caption: 'Active instances', icon: Database },
+    { title: 'Deployments', value: deployments.length, caption: 'Recent deployments', icon: Rocket },
+  ];
+
   return (
-    <ProtectedLayout>
+    <ProtectedLayout requireClient>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your deployment system</p>
-        </div>
+        <PageHeader
+          title="Dashboard"
+          description={`Overview of your deployment system${selectedClient ? ` for ${selectedClient.name}` : ''}`}
+          icon={Home}
+        />
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Applications</CardTitle>
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{applications.length}</div>
-              <p className="text-xs text-muted-foreground">Total applications</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Database Instances</CardTitle>
-              <Database className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{instances.length}</div>
-              <p className="text-xs text-muted-foreground">Active instances</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Deployments</CardTitle>
-              <Rocket className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{deployments.length}</div>
-              <p className="text-xs text-muted-foreground">Recent deployments</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {stats.map(({ title, value, caption, icon: Icon }) => (
+            <Card key={title}>
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                  <div className="text-2xl font-semibold text-foreground">{value}</div>
+                  <p className="text-xs text-muted-foreground">{caption}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Recent Deployments */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <CardTitle>Recent Deployments</CardTitle>
                 <CardDescription>Latest deployment activities</CardDescription>
@@ -107,15 +104,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center text-muted-foreground">Loading...</p>
+              <LoadingState className="py-8" label="Loading..." />
             ) : deployments.length === 0 ? (
-              <p className="text-center text-muted-foreground">No deployments yet</p>
+              <EmptyState compact icon={Rocket} title="No deployments yet" />
             ) : (
-              <div className="space-y-4">
+              <div className="divide-y divide-border">
                 {deployments.map((deployment) => (
-                  <div key={deployment.id} className="flex items-center justify-between pb-4">
-                    <div className="space-y-1">
-                      <p className="font-medium">
+                  <div
+                    key={deployment.id}
+                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <p className="font-medium text-foreground">
                         {deployment.applicationName} - {deployment.instanceName}
                       </p>
                       <p className="text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ export default function DashboardPage() {
                         {formatDate(deployment.deployedAt)}
                       </p>
                     </div>
-                    <div>{getStatusBadge(deployment.status)}</div>
+                    <div className="shrink-0">{getStatusBadge(deployment.status)}</div>
                   </div>
                 ))}
               </div>
@@ -143,7 +143,7 @@ export default function DashboardPage() {
             <CardContent>
               <Link href="/deploy">
                 <Button className="w-full">
-                  <Rocket className="mr-2 h-4 w-4" />
+                  <Rocket className="h-4 w-4" />
                   Start Deployment
                 </Button>
               </Link>
@@ -167,6 +167,3 @@ export default function DashboardPage() {
     </ProtectedLayout>
   );
 }
-
-
-

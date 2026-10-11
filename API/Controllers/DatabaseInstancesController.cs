@@ -20,14 +20,14 @@ public class DatabaseInstancesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all database instances
+    /// Get all database instances (optionally filtered by client)
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int? clientId = null)
     {
         try
         {
-            var instances = await _instanceService.GetAllInstancesAsync();
+            var instances = await _instanceService.GetAllInstancesAsync(clientId);
             return Ok(instances);
         }
         catch (Exception ex)

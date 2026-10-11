@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,10 +14,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import api, { Application, DatabaseInstance } from '@/lib/api';
 import { Database, Plus, Trash2, CheckCircle, XCircle, Play } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 
 function InstancesContent() {
   const searchParams = useSearchParams();
   const appIdParam = searchParams?.get('app');
+  const { selectedClientId } = useClientStore();
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [instances, setInstances] = useState<DatabaseInstance[]>([]);
@@ -33,14 +38,14 @@ function InstancesContent() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (selectedClientId) loadData();
+  }, [selectedClientId]);
 
   const loadData = async () => {
     try {
       const [apps, insts] = await Promise.all([
-        api.getApplications(),
-        api.getDatabaseInstances(),
+        api.getApplications(selectedClientId),
+        api.getDatabaseInstances(selectedClientId),
       ]);
       setApplications(apps);
       setInstances(insts);
@@ -101,58 +106,48 @@ function InstancesContent() {
     instances: instances.filter((inst) => inst.applicationId === app.id),
   }));
 
+  const addButton = (
+    <Button onClick={() => setIsCreateOpen(true)}>
+      <Plus className="h-4 w-4" />
+      Add Instance
+    </Button>
+  );
+
   return (
-    <ProtectedLayout>
+    <ProtectedLayout requireClient>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Database Instances</h1>
-            <p className="text-muted-foreground">Manage database instances for your applications</p>
-          </div>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Instance
-          </Button>
-        </div>
+        <PageHeader
+          title="Database Instances"
+          description="Manage database instances for your applications"
+          icon={Database}
+          actions={addButton}
+        />
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading instances...</p>
-          </div>
+          <LoadingState label="Loading instances..." />
         ) : instances.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Database className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No database instances yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Add your first database instance to start deploying
-              </p>
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Instance
-              </Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Database}
+            title="No database instances yet"
+            description="Add your first database instance to start deploying"
+            action={addButton}
+          />
         ) : (
           <div className="space-y-6">
             {groupedInstances.map(({ application, instances }) => (
               <div key={application.id}>
-                <h2 className="text-xl font-semibold mb-4">{application.name}</h2>
+                <h2 className="text-base font-semibold text-foreground mb-3">{application.name}</h2>
                 {instances.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-6 text-center text-muted-foreground">
-                      No instances for this application
-                    </CardContent>
-                  </Card>
+                  <EmptyState compact title="No instances for this application" />
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {instances.map((instance) => (
-                      <Card key={instance.id} className="hover:shadow-lg transition-shadow">
+                      <Card key={instance.id} className="hover:shadow-md transition-shadow">
                         <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Database className="h-5 w-5 text-primary" />
-                              <CardTitle className="text-lg">{instance.instanceName}</CardTitle>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Database className="h-5 w-5 shrink-0 text-primary" />
+                              <CardTitle className="truncate">{instance.instanceName}</CardTitle>
                             </div>
                             <Button
                               variant="ghost"
@@ -174,12 +169,12 @@ function InstancesContent() {
                               <span className="text-muted-foreground">Status</span>
                               {instance.isActive ? (
                                 <Badge variant="success">
-                                  <CheckCircle className="mr-1 h-3 w-3" />
+                                  <CheckCircle className="h-3 w-3" />
                                   Active
                                 </Badge>
                               ) : (
                                 <Badge variant="destructive">
-                                  <XCircle className="mr-1 h-3 w-3" />
+                                  <XCircle className="h-3 w-3" />
                                   Inactive
                                 </Badge>
                               )}
@@ -198,7 +193,7 @@ function InstancesContent() {
                                 'Testing...'
                               ) : (
                                 <>
-                                  <Play className="mr-2 h-3 w-3" />
+                                  <Play className="h-3 w-3" />
                                   Test Connection
                                 </>
                               )}
@@ -225,7 +220,7 @@ function InstancesContent() {
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
               {error && (
-                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
@@ -253,6 +248,7 @@ function InstancesContent() {
                 <Input
                   id="instanceName"
                   placeholder="e.g., Production, Stage, Dev"
+                  autoComplete="off"
                   value={newInstance.instanceName}
                   onChange={(e) =>
                     setNewInstance({ ...newInstance, instanceName: e.target.value })
@@ -266,6 +262,7 @@ function InstancesContent() {
                 <Input
                   id="connectionString"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="Server=...;Database=...;User Id=...;Password=..."
                   value={newInstance.connectionString}
                   onChange={(e) =>

@@ -29,6 +29,12 @@ public interface IApiDeploymentService
     /// Deploys a frontend ZIP to a remote server
     /// </summary>
     Task<ApiDeploymentResultDto> DeployFrontendAsync(DeployFrontendRequest request, int userId);
+
+    /// <summary>
+    /// Deploys a build artifact from Azure DevOps to a server using the existing IIS deployment steps
+    /// </summary>
+    Task<ApiDeploymentResultDto> DeployFromAzureArtifactAsync(DeployAzureArtifactRequest request, int userId,
+        CancellationToken cancellationToken = default);
 }
 
 

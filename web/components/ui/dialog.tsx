@@ -1,6 +1,5 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { X } from "lucide-react"
 
 interface DialogProps {
   open: boolean
@@ -9,15 +8,33 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
+  // Close on Escape and stop the page behind from scrolling while open
+  React.useEffect(() => {
+    if (!open) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onOpenChange(false)
+    }
+    const previousOverflow = document.body.style.overflow
+
+    document.addEventListener("keydown", onKeyDown)
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open, onOpenChange])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50 w-full max-w-lg">{children}</div>
+      {children}
     </div>
   )
 }
@@ -32,7 +49,7 @@ export function DialogContent({
   return (
     <div
       className={cn(
-        "relative rounded-lg border bg-card p-6 shadow-lg",
+        "relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl animate-dialog-in",
         className
       )}
     >
@@ -48,7 +65,7 @@ export function DialogHeader({
   children: React.ReactNode
   className?: string
 }) {
-  return <div className={cn("mb-4", className)}>{children}</div>
+  return <div className={cn("mb-5 space-y-1", className)}>{children}</div>
 }
 
 export function DialogTitle({
@@ -59,7 +76,7 @@ export function DialogTitle({
   className?: string
 }) {
   return (
-    <h2 className={cn("text-lg font-semibold", className)}>{children}</h2>
+    <h2 className={cn("text-lg font-semibold tracking-tight", className)}>{children}</h2>
   )
 }
 
@@ -86,6 +103,3 @@ export function DialogFooter({
     <div className={cn("flex justify-end gap-2 mt-6", className)}>{children}</div>
   )
 }
-
-
-

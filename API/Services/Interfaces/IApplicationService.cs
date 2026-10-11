@@ -5,7 +5,7 @@ namespace API.Services.Interfaces;
 
 public interface IApplicationService
 {
-    Task<List<ApplicationDto>> GetAllApplicationsAsync();
+    Task<List<ApplicationDto>> GetAllApplicationsAsync(int? clientId = null);
     Task<ApplicationDto?> GetApplicationByIdAsync(int id);
     Task<ApplicationDto> CreateApplicationAsync(CreateApplicationRequest request, string createdBy);
     Task<bool> DeleteApplicationAsync(int id);

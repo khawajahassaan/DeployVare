@@ -92,6 +92,53 @@ public class SchemaComparisonController : ControllerBase
             return StatusCode(500, new { message = $"Object transfer failed: {ex.Message}" });
         }
     }
+
+    /// <summary>
+    /// Compare schemas where either side can be a .dbsnap file or a live database instance.
+    /// Send as multipart/form-data.
+    /// </summary>
+    [HttpPost("compare-with-snap")]
+    [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)] // 100 MB
+    public async Task<IActionResult> CompareWithSnap(
+        IFormFile? sourceFile,
+        IFormFile? targetFile,
+        [FromForm] int? sourceInstanceId,
+        [FromForm] int? targetInstanceId)
+    {
+        try
+        {
+            var hasSourceSnap = sourceFile is not null;
+            var hasTargetSnap = targetFile is not null;
+
+            if (!hasSourceSnap && (sourceInstanceId is null or 0))
+                return BadRequest(new { message = "Provide either sourceFile or sourceInstanceId." });
+            if (!hasTargetSnap && (targetInstanceId is null or 0))
+                return BadRequest(new { message = "Provide either targetFile or targetInstanceId." });
+
+            Stream? srcStream = hasSourceSnap ? sourceFile!.OpenReadStream() : null;
+            Stream? tgtStream = hasTargetSnap ? targetFile!.OpenReadStream() : null;
+            var srcLabel = hasSourceSnap ? sourceFile!.FileName : $"Instance {sourceInstanceId}";
+            var tgtLabel = hasTargetSnap ? targetFile!.FileName : $"Instance {targetInstanceId}";
+
+            var result = await _comparisonService.CompareWithSnapAsync(
+                srcStream, srcLabel,
+                tgtStream, tgtLabel,
+                hasSourceSnap ? null : sourceInstanceId,
+                hasTargetSnap ? null : targetInstanceId);
+
+            return Ok(result);
+        }
+        catch (InvalidDataException ex)
+        {
+            _logger.LogWarning(ex, "Invalid .dbsnap file uploaded");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "compare-with-snap failed");
+            return StatusCode(500, new { message = $"Comparison failed: {ex.Message}" });
+        }
+    }
 }
 
 

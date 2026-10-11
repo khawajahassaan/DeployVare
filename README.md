@@ -58,6 +58,13 @@ DeployVare/
 - Visual indicators for added, removed, modified objects
 - Export-ready results
 
+### 🐧 Linux Deployment (NEW!)
+- **Manual Deployment:** `Deploy.sh` bash script for Ubuntu/Debian
+- **Docker Support:** Self-contained .NET with Nginx + Redis
+- **Cross-Platform:** Nginx and Apache support for reverse proxy
+- **Systemd Integration:** Auto-restart, log aggregation, health checks
+- **Remote Orchestration:** SSH-based remote deployment from DeployVare
+
 ---
 
 ## 🛠️ Tech Stack
@@ -179,6 +186,13 @@ npm run dev
 
 ## 📖 Documentation
 
+### Deployment Guides
+- **[LINUX_DEPLOYMENT.md](LINUX_DEPLOYMENT.md)** ✨ **NEW** - Linux (Ubuntu/Debian) deployment guide
+  - Manual deployment with `Deploy.sh`
+  - Docker/docker-compose setup
+  - Remote orchestration via DeployVare
+  
+### Setup & Configuration
 - **[START.md](START.md)** - Quick start guide
 - **[COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md)** - Detailed setup
 - **[FRONTEND_COMPLETE.md](FRONTEND_COMPLETE.md)** - Frontend documentation

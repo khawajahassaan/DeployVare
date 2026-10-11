@@ -3,22 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all",
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors",
   {
     variants: {
       variant: {
         default:
-          "bg-blue-500 text-white shadow-sm hover:bg-blue-600",
+          "bg-blue-50 text-blue-700 ring-blue-600/20",
         secondary:
-          "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300",
+          "bg-slate-100 text-slate-700 ring-slate-500/15",
         destructive:
-          "bg-red-500 text-white shadow-sm hover:bg-red-600",
-        outline: 
-          "bg-gray-100 text-gray-700 ring-1 ring-gray-300 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600",
+          "bg-red-50 text-red-700 ring-red-600/20",
+        outline:
+          "bg-transparent text-slate-700 ring-slate-300",
         success:
-          "bg-green-500 text-white shadow-sm hover:bg-green-600",
+          "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
         warning:
-          "bg-yellow-500 text-white shadow-sm hover:bg-yellow-600",
+          "bg-amber-50 text-amber-800 ring-amber-600/25",
       },
     },
     defaultVariants: {
@@ -38,6 +38,3 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export { Badge, badgeVariants }
-
-
-

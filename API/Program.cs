@@ -116,7 +116,7 @@ builder.Services.AddSwaggerGen(options =>
 // Configure Database – read DB_PROVIDER env var set by the Tauri sidecar launcher.
 // "sqlite"    → SQLite file stored next to the app (default / local mode)
 // "sqlserver" → SQL Server (cloud / enterprise mode, requires a connection string)
-var dbProvider = (Environment.GetEnvironmentVariable("DB_PROVIDER") ?? "sqlite").ToLowerInvariant();
+var dbProvider = "sqlserver";//(Environment.GetEnvironmentVariable("DB_PROVIDER") ?? "sqlite").ToLowerInvariant();
 var dbConnStr = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
                 ?? builder.Configuration.GetConnectionString("DeployVareDb")!;
 
@@ -185,6 +185,7 @@ builder.Services.AddScoped<API.Services.Interfaces.ISqlExecutionService, API.Ser
 builder.Services.AddScoped<API.Services.Interfaces.IBackupService, API.Services.Implementations.BackupService>();
 builder.Services.AddScoped<API.Services.Interfaces.IDeploymentService, API.Services.Implementations.DeploymentService>();
 builder.Services.AddScoped<API.Services.Interfaces.ISchemaComparisonService, API.Services.Implementations.SchemaComparisonService>();
+builder.Services.AddScoped<API.Services.Interfaces.IClientService, API.Services.Implementations.ClientService>();
 builder.Services.AddScoped<API.Services.Interfaces.IApplicationService, API.Services.Implementations.ApplicationService>();
 builder.Services.AddScoped<API.Services.Interfaces.IDatabaseInstanceService, API.Services.Implementations.DatabaseInstanceService>();
 builder.Services.AddScoped<API.Services.Interfaces.IAuthService, API.Services.Implementations.AuthService>();
@@ -195,6 +196,30 @@ builder.Services.AddScoped<API.Services.Interfaces.ISshService, API.Services.Imp
 builder.Services.AddScoped<API.Services.Interfaces.IIisManagementService, API.Services.Implementations.IisManagementService>();
 builder.Services.AddScoped<API.Services.Interfaces.IApiDeploymentService, API.Services.Implementations.ApiDeploymentService>();
 builder.Services.AddScoped<API.Services.Interfaces.IApplicationServerService, API.Services.Implementations.ApplicationServerService>();
+
+// Azure DevOps integration (credentials are stored per client in the database, not in configuration)
+builder.Services.Configure<API.Models.AzureDevOpsOptions>(builder.Configuration.GetSection(API.Models.AzureDevOpsOptions.SectionName));
+builder.Services.AddHttpClient<API.Services.Interfaces.IAzureDevOpsService, API.Services.Implementations.AzureDevOpsService>(client =>
+{
+    // Timeouts are enforced per request by the service (short for REST calls, long for artifact downloads)
+    client.Timeout = Timeout.InfiniteTimeSpan;
+});
+builder.Services.AddScoped<API.Services.Interfaces.IAzureDevOpsConfigService, API.Services.Implementations.AzureDevOpsConfigService>();
+
+// Server readiness / setup (IIS, site, runtimes, Redis, SSL, bindings)
+builder.Services.Configure<API.Models.ServerSetupOptions>(builder.Configuration.GetSection(API.Models.ServerSetupOptions.SectionName));
+builder.Services.AddSingleton<API.Services.Interfaces.IInstallerCatalog, API.Services.Implementations.InstallerCatalog>();
+builder.Services.AddScoped<API.Services.Interfaces.IServerReadinessService, API.Services.Implementations.ServerReadinessService>();
+builder.Services.AddScoped<API.Services.Interfaces.ISqlServerSetupService, API.Services.Implementations.SqlServerSetupService>();
+builder.Services.AddScoped<API.Services.Interfaces.IFrontendRuntimeConfigService, API.Services.Implementations.FrontendRuntimeConfigService>();
+builder.Services.AddScoped<API.Services.Interfaces.IDatabaseMigrationService, API.Services.Implementations.DatabaseMigrationService>();
+builder.Services.AddSingleton<API.Services.Interfaces.IDeploymentProgressTracker, API.Services.Implementations.DeploymentProgressTracker>();
+builder.Services.AddScoped<API.Services.Interfaces.IManualPackageService, API.Services.Implementations.ManualPackageService>();
+
+// Licensing: the signing key lives outside the application folder, so only this installation can issue licences
+builder.Services.Configure<API.Models.LicensingOptions>(builder.Configuration.GetSection(API.Models.LicensingOptions.SectionName));
+builder.Services.AddSingleton<API.Services.Interfaces.ISigningKeyStore, API.Services.Implementations.SigningKeyStore>();
+builder.Services.AddScoped<API.Services.Interfaces.ILicensingService, API.Services.Implementations.LicensingService>();
 
 // File storage – local by default; switch to B2 when the env var is set by the Tauri sidecar launcher
 var b2Enabled = string.Equals(Environment.GetEnvironmentVariable("B2_ENABLED"), "true", StringComparison.OrdinalIgnoreCase);
@@ -260,11 +285,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Create upload and backup directories
-var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-var backupPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "backups");
-Directory.CreateDirectory(uploadPath);
-Directory.CreateDirectory(backupPath);
+// Upload and backup folders are created under the data directory at startup (see FileUploadSettings above).
+// Do not use Directory.GetCurrentDirectory() here: under IIS it is C:\Windows\System32\inetsrv, which is not writable.
 
 Log.Information("DeployVare API Started");
 

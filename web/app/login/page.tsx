@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Rocket, ChevronDown, ChevronUp } from 'lucide-react';
+import { Rocket, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { getConfig, saveConfig, restartApp, type AppConfig } from '@/lib/tauri';
 
 export default function LoginPage() {
@@ -59,20 +59,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
-            <Rocket className="h-6 w-6 text-primary-foreground" />
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Rocket className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl font-bold">DeployVare</CardTitle>
+          <CardTitle className="text-2xl font-semibold tracking-tight">DeployVare</CardTitle>
           <CardDescription>SQL Deployment Management System</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                {error}
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
             <div className="space-y-2">
@@ -106,10 +107,10 @@ export default function LoginPage() {
 
           {/* Database settings collapsible — only shown inside Tauri */}
           {config !== null && (
-            <div className="border rounded-md">
+            <div className="overflow-hidden rounded-lg border border-border">
               <button
                 type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
                 onClick={() => setDbOpen((v) => !v)}
               >
                 <span>Database Settings</span>
@@ -117,17 +118,17 @@ export default function LoginPage() {
               </button>
 
               {dbOpen && (
-                <div className="px-4 pb-4 space-y-3 border-t pt-3">
+                <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
                   {/* Mode tabs */}
-                  <div className="flex rounded-md overflow-hidden border text-sm">
+                  <div className="flex overflow-hidden rounded-md border border-border text-sm">
                     {['local', 'sqlserver'].map((mode) => (
                       <button
                         key={mode}
                         type="button"
-                        className={`flex-1 py-1.5 transition-colors ${
+                        className={`flex-1 py-1.5 font-medium transition-colors ${
                           config.dbMode === mode
                             ? 'bg-primary text-primary-foreground'
-                            : 'bg-background hover:bg-muted/50'
+                            : 'bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                         }`}
                         onClick={() => setConfig({ ...config, dbMode: mode })}
                       >

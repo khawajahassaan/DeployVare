@@ -2,15 +2,44 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import api, { ApplicationServer, ApiDeploymentResult } from '@/lib/api';
-import { Upload, Server, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
+import {
+  Upload,
+  Server,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Clock,
+  AlertTriangle,
+  MinusCircle,
+  Circle,
+  ListChecks,
+} from 'lucide-react';
+
+const DEPLOY_STEPS = ['Stop IIS services', 'Back up existing files', 'Deploy new files', 'Restart IIS services'];
+
+// Step log lines are prefixed by the server with ✓ / ⚠ / ✗ / ⊘
+function StepIcon({ step }: { step: string }) {
+  const className = 'mt-0.5 h-3.5 w-3.5 shrink-0';
+  if (step.startsWith('✓')) return <CheckCircle2 className={`${className} text-emerald-600`} />;
+  if (step.startsWith('⚠')) return <AlertTriangle className={`${className} text-amber-600`} />;
+  if (step.startsWith('✗')) return <XCircle className={`${className} text-red-600`} />;
+  if (step.startsWith('⊘')) return <MinusCircle className={`${className} text-muted-foreground`} />;
+  return <Circle className={`${className} text-muted-foreground/60`} />;
+}
 
 export default function ApiDeployPage() {
+  const { selectedClientId } = useClientStore();
   const [servers, setServers] = useState<ApplicationServer[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<number>(0);
   const [version, setVersion] = useState('');
@@ -20,13 +49,14 @@ export default function ApiDeployPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadServers();
-  }, []);
+    if (selectedClientId) loadServers();
+  }, [selectedClientId]);
 
   const loadServers = async () => {
     try {
-      const data = await api.getApplicationServers();
+      const data = await api.getApplicationServers(selectedClientId);
       setServers(data.filter(s => s.isActive));
+      setSelectedServerId(0);
     } catch (error: any) {
       console.error('Error loading servers:', error);
       alert(`Error: ${error.response?.data?.error || error.message}`);
@@ -43,7 +73,7 @@ export default function ApiDeployPage() {
 
   const handleDeploy = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedServerId) {
       alert('Please select a server');
       return;
@@ -64,7 +94,7 @@ export default function ApiDeployPage() {
     try {
       const result = await api.deployApi(selectedServerId, files, version || undefined);
       setDeploymentResult(result);
-      
+
       // Reset form on success
       if (result.status === 'Success') {
         setFiles([]);
@@ -95,14 +125,20 @@ export default function ApiDeployPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const pageHeader = (
+    <PageHeader
+      title="Deploy API"
+      description="Deploy DLL files and other API assets to Windows servers"
+      icon={Upload}
+    />
+  );
+
   if (loading) {
     return (
-      <ProtectedLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading...</p>
-          </div>
+      <ProtectedLayout requireClient>
+        <div className="space-y-6">
+          {pageHeader}
+          <LoadingState label="Loading servers..." />
         </div>
       </ProtectedLayout>
     );
@@ -111,227 +147,276 @@ export default function ApiDeployPage() {
   const selectedServer = servers.find(s => s.id === selectedServerId);
 
   return (
-    <ProtectedLayout>
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deploy API</h1>
-          <p className="text-muted-foreground">
-            Deploy DLL files and other API assets to Windows servers
-          </p>
-        </div>
+    <ProtectedLayout requireClient>
+      <div className="space-y-6">
+        {pageHeader}
 
-        {/* Deployment Form */}
-        <form onSubmit={handleDeploy}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Deployment Configuration</CardTitle>
-              <CardDescription>
-                Select target server and upload files to deploy
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Server Selection */}
-              <div>
-                <Label htmlFor="server">Target Server *</Label>
-                <select
-                  id="server"
-                  className="w-full border rounded-md p-2 mt-1"
-                  value={selectedServerId}
-                  onChange={(e) => setSelectedServerId(Number(e.target.value))}
-                  required
-                  disabled={deploying}
-                >
-                  <option value={0}>Select a server...</option>
-                  {servers.map((server) => (
-                    <option key={server.id} value={server.id}>
-                      {server.serverName} - {server.applicationName} ({server.hostName})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Server Info */}
-              {selectedServer && (
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <Server className="h-4 w-4" />
-                    Server Details
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Main flow */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Deployment Form */}
+            <form onSubmit={handleDeploy}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Deployment Configuration</CardTitle>
+                  <CardDescription>
+                    Select target server and upload files to deploy
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Server Selection */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="server">Target Server *</Label>
+                    <Select
+                      id="server"
+                      value={selectedServerId}
+                      onChange={(e) => setSelectedServerId(Number(e.target.value))}
+                      required
+                      disabled={deploying}
+                    >
+                      <option value={0}>Select a server...</option>
+                      {servers.map((server) => (
+                        <option key={server.id} value={server.id}>
+                          {server.serverName} - {server.applicationName} ({server.hostName})
+                        </option>
+                      ))}
+                    </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
-                    <div>
-                      <span className="text-muted-foreground">Website:</span>
-                      <span className="ml-2 font-mono text-xs">{selectedServer.websiteName}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">App Pool:</span>
-                      <span className="ml-2 font-mono text-xs">{selectedServer.appPoolName}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Path:</span>
-                      <span className="ml-2 font-mono text-xs">{selectedServer.deploymentPath}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Version */}
-              <div>
-                <Label htmlFor="version">Version (Optional)</Label>
-                <Input
-                  id="version"
-                  value={version}
-                  onChange={(e) => setVersion(e.target.value)}
-                  placeholder="1.0.0"
-                  disabled={deploying}
-                />
-              </div>
-
-              {/* File Upload */}
-              <div>
-                <Label htmlFor="files">Files to Deploy *</Label>
-                <Input
-                  id="files"
-                  type="file"
-                  onChange={handleFileChange}
-                  multiple
-                  accept=".dll,.exe,.json,.pdb,.config,.xml"
-                  disabled={deploying}
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Select DLL, EXE, JSON, PDB, and config files
-                </p>
-              </div>
-
-              {/* Selected Files */}
-              {files.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Selected Files ({files.length})</Label>
-                  <div className="bg-muted/50 rounded-lg p-3 max-h-48 overflow-y-auto">
-                    {files.map((file, index) => (
-                      <div key={index} className="flex justify-between items-center py-1 text-sm">
-                        <span className="font-mono text-xs truncate flex-1">{file.name}</span>
-                        <span className="text-muted-foreground text-xs ml-2">{formatFileSize(file.size)}</span>
+                  {/* Server Info */}
+                  {selectedServer && (
+                    <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+                      <div className="flex items-center gap-2 font-semibold text-foreground">
+                        <Server className="h-4 w-4 text-muted-foreground" />
+                        Server Details
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Deploy Button */}
-              <div className="pt-4">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={deploying || !selectedServerId || files.length === 0}
-                >
-                  {deploying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Deploying...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Deploy to Server
-                    </>
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                        <div>
+                          <span className="text-muted-foreground">Website:</span>
+                          <span className="ml-2 break-all font-mono text-xs">{selectedServer.websiteName}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">App Pool:</span>
+                          <span className="ml-2 break-all font-mono text-xs">{selectedServer.appPoolName}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-muted-foreground">Path:</span>
+                          <span className="ml-2 break-all font-mono text-xs">{selectedServer.deploymentPath}</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </form>
+
+                  {/* Version */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="version">Version (Optional)</Label>
+                    <Input
+                      id="version"
+                      value={version}
+                      onChange={(e) => setVersion(e.target.value)}
+                      placeholder="1.0.0"
+                      disabled={deploying}
+                    />
+                  </div>
+
+                  {/* File Upload */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="files">Files to Deploy *</Label>
+                    <input
+                      id="files"
+                      type="file"
+                      onChange={handleFileChange}
+                      multiple
+                      accept=".dll,.exe,.json,.pdb,.config,.xml"
+                      disabled={deploying}
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Select DLL, EXE, JSON, PDB, and config files
+                    </p>
+                  </div>
+
+                  {/* Selected Files */}
+                  {files.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Selected Files ({files.length})</Label>
+                      <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                        {files.map((file, index) => (
+                          <li key={index} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                            <span className="flex-1 truncate font-mono text-xs">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Deploy Button */}
+                  <div className="border-t border-border pt-6">
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={deploying || !selectedServerId || files.length === 0}
+                    >
+                      {deploying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Deploying...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          Deploy to Server
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </form>
+
+            {servers.length === 0 && (
+              <EmptyState
+                icon={Server}
+                title="No servers configured"
+                description="Add a server first to start deploying"
+                action={
+                  <Button onClick={() => window.location.href = '/servers'}>
+                    Go to Servers
+                  </Button>
+                }
+              />
+            )}
+          </div>
+
+          {/* Side column */}
+          <div className="space-y-6 self-start lg:sticky lg:top-24">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  {deploying ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : (
+                    <ListChecks className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <CardTitle>Deployment Steps</CardTitle>
+                </div>
+                <CardDescription>What happens when files are deployed</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-2">
+                  {DEPLOY_STEPS.map((step, index) => (
+                    <li key={step} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-foreground">
+                        {index + 1}
+                      </span>
+                      <span className="pt-px">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
+                  Accepted file types: .dll, .exe, .json, .pdb, .config, .xml
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Deployment Result */}
         {deploymentResult && (
-          <Card className={deploymentResult.status === 'Success' ? 'ring-2 ring-green-500/30 shadow-green-100' : 'ring-2 ring-red-500/30 shadow-red-100'}>
+          <Card className={deploymentResult.status === 'Success' ? 'border-emerald-200' : 'border-red-200'}>
             <CardHeader>
               <div className="flex items-center gap-3">
                 {deploymentResult.status === 'Success' ? (
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
                 ) : (
-                  <XCircle className="h-6 w-6 text-red-600" />
+                  <XCircle className="h-6 w-6 shrink-0 text-red-600" />
                 )}
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <CardTitle>
                     {deploymentResult.status === 'Success' ? 'Deployment Successful' : 'Deployment Failed'}
                   </CardTitle>
                   <CardDescription>{deploymentResult.message}</CardDescription>
                 </div>
-                <Badge variant={deploymentResult.status === 'Success' ? 'default' : 'destructive'}>
-                  {deploymentResult.status}
-                </Badge>
+                <div className="flex items-center gap-3">
+                  <span className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:inline-flex">
+                    <Clock className="h-4 w-4" />
+                    Duration: {deploymentResult.deploymentDurationSeconds}s
+                  </span>
+                  <Badge variant={deploymentResult.status === 'Success' ? 'success' : 'destructive'}>
+                    {deploymentResult.status}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Duration */}
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+              {/* Duration (small screens) */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground sm:hidden">
+                <Clock className="h-4 w-4" />
                 <span>Duration: {deploymentResult.deploymentDurationSeconds}s</span>
               </div>
 
-              {/* Deployment Steps */}
-              {deploymentResult.deploymentSteps.length > 0 && (
-                <div>
-                  <Label className="text-sm">Deployment Steps:</Label>
-                  <div className="mt-2 bg-muted/50 rounded-lg p-3 space-y-1">
-                    {deploymentResult.deploymentSteps.map((step, index) => (
-                      <div key={index} className="text-sm font-mono text-xs">
-                        {step}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Error Message */}
               {deploymentResult.errorMessage && (
-                <div className="bg-red-50 ring-1 ring-red-200 rounded-lg p-3 shadow-sm">
-                  <Label className="text-sm text-red-900">Error:</Label>
-                  <p className="text-sm text-red-700 mt-1 font-mono text-xs">
-                    {deploymentResult.errorMessage}
-                  </p>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <p className="font-medium text-red-800">Error:</p>
+                  <p className="mt-1 break-words font-mono text-xs">{deploymentResult.errorMessage}</p>
                 </div>
               )}
 
               {/* Backup Info */}
               {deploymentResult.backupFileName && (
-                <div className="bg-blue-50 ring-1 ring-blue-200 rounded-lg p-3 shadow-sm">
-                  <Label className="text-sm text-blue-900">Backup Created:</Label>
-                  <p className="text-sm text-blue-700 mt-1 font-mono text-xs">
-                    {deploymentResult.backupFileName}
-                  </p>
+                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 text-sm">
+                  <p className="font-medium text-blue-900">Backup Created:</p>
+                  <p className="mt-1 break-all font-mono text-xs text-blue-700">{deploymentResult.backupFileName}</p>
                 </div>
               )}
 
-              {/* Deployed Files */}
-              {deploymentResult.deployedFiles.length > 0 && (
-                <div>
-                  <Label className="text-sm">Deployed Files ({deploymentResult.deployedFiles.length}):</Label>
-                  <div className="mt-2 bg-muted/50 rounded-lg p-3 max-h-32 overflow-y-auto">
-                    {deploymentResult.deployedFiles.map((file) => (
-                      <div key={file.id} className="flex justify-between items-center py-1 text-sm">
-                        <span className="font-mono text-xs">{file.fileName}</span>
-                        <span className="text-muted-foreground text-xs">{formatFileSize(file.fileSize)}</span>
-                      </div>
-                    ))}
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Deployment Steps */}
+                {deploymentResult.deploymentSteps.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Deployment Steps:</p>
+                    <ul className="divide-y divide-border rounded-lg border border-border">
+                      {deploymentResult.deploymentSteps.map((step, index) => (
+                        <li key={index} className="flex items-start gap-2 px-3 py-2 font-mono text-xs">
+                          <StepIcon step={step} />
+                          <span className="break-words">{step}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                )}
 
-        {servers.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Server className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No servers configured</h3>
-              <p className="text-muted-foreground mb-4">Add a server first to start deploying</p>
-              <Button onClick={() => window.location.href = '/servers'}>
-                Go to Servers
-              </Button>
+                {/* Deployed Files */}
+                {deploymentResult.deployedFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">
+                      Deployed Files ({deploymentResult.deployedFiles.length}):
+                    </p>
+                    <div className="max-h-96 overflow-auto rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2 text-left">File</th>
+                            <th className="px-3 py-2 text-right">Size</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {deploymentResult.deployedFiles.map((file) => (
+                            <tr key={file.id}>
+                              <td className="px-3 py-2 font-mono text-xs">{file.fileName}</td>
+                              <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">
+                                {formatFileSize(file.fileSize)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -339,5 +424,3 @@ export default function ApiDeployPage() {
     </ProtectedLayout>
   );
 }
-
-

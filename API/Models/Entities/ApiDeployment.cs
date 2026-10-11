@@ -37,6 +37,34 @@ public class ApiDeployment
 
     public AppDeploymentType DeploymentType { get; set; } = AppDeploymentType.Api;
 
+    /// <summary>
+    /// Whether this deployment enabled licensing on the server. Recorded so we can tell which clients have been
+    /// migrated. Existing rows read back as WithoutLicense, which is what they were.
+    /// </summary>
+    public LicensingMode LicensingMode { get; set; } = LicensingMode.WithoutLicense;
+
+    /// <summary>Licence installed by this deployment, when it was a licensed one.</summary>
+    [MaxLength(50)]
+    public string? LicenseId { get; set; }
+
+    // Azure DevOps artifact traceability (null for manual uploads)
+    [MaxLength(20)]
+    public string? ArtifactEnvironment { get; set; }
+
+    public int? AzureBuildId { get; set; }
+
+    [MaxLength(100)]
+    public string? AzureBuildNumber { get; set; }
+
+    [MaxLength(200)]
+    public string? AzureArtifactName { get; set; }
+
+    [MaxLength(250)]
+    public string? SourceBranch { get; set; }
+
+    [MaxLength(64)]
+    public string? SourceVersion { get; set; }
+
     public string? ErrorMessage { get; set; }
 
     public int? DeploymentDurationSeconds { get; set; }

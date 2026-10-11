@@ -13,6 +13,7 @@ public class DeployVareDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<UserPermission> UserPermissions { get; set; }
+    public DbSet<Client> Clients { get; set; }
     public DbSet<Application> Applications { get; set; }
     public DbSet<DatabaseInstance> DatabaseInstances { get; set; }
     public DbSet<Deployment> Deployments { get; set; }
@@ -25,6 +26,17 @@ public class DeployVareDbContext : DbContext
     public DbSet<ApiDeployment> ApiDeployments { get; set; }
     public DbSet<ApiDeploymentFile> ApiDeploymentFiles { get; set; }
 
+    // Azure DevOps integration entities
+    public DbSet<AzureDevOpsConnection> AzureDevOpsConnections { get; set; }
+    public DbSet<ArtifactSource> ArtifactSources { get; set; }
+
+    // Server setup
+    public DbSet<ServerReadinessCheck> ServerReadinessChecks { get; set; }
+
+    // Licensing
+    public DbSet<License> Licenses { get; set; }
+    public DbSet<LicenseActivation> LicenseActivations { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -32,6 +44,66 @@ public class DeployVareDbContext : DbContext
         // Use the correct SQL function for the active database provider
         var isSqlite = Database.IsSqlite();
         var nowSql = isSqlite ? "datetime('now')" : "GETUTCDATE()";
+
+        // Licence Configuration
+        modelBuilder.Entity<License>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.LicenseId).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.LicenseId).IsUnique();
+            entity.Property(e => e.Product).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(e => e.Payload).IsRequired();
+            entity.Property(e => e.Signature).IsRequired();
+            entity.Property(e => e.KeyId).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Features).HasMaxLength(2000);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+
+            entity.HasIndex(e => new { e.ClientId, e.Product });
+
+            entity.HasOne(e => e.Client)
+                .WithMany()
+                .HasForeignKey(e => e.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Licence Activation Configuration
+        modelBuilder.Entity<LicenseActivation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MachinePublicKey).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.MachineFingerprint).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.MachineName).HasMaxLength(200);
+            entity.Property(e => e.ServerIdentity).HasMaxLength(500);
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(e => e.ActivatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DeactivationReason).HasMaxLength(600);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+
+            entity.HasOne(e => e.License)
+                .WithMany(l => l.Activations)
+                .HasForeignKey(e => e.LicenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // One row per machine per licence, so re-activating the same server is idempotent
+            entity.HasIndex(e => new { e.LicenseId, e.MachineFingerprint })
+                .IsUnique()
+                .HasDatabaseName("UQ_License_Machine");
+
+            // The database, not application code, enforces that only one machine holds a licence at a time
+            entity.HasIndex(e => e.LicenseId)
+                .IsUnique()
+                .HasFilter(isSqlite ? "\"Status\" = 'Active'" : "[Status] = 'Active'")
+                .HasDatabaseName("UQ_License_ActiveActivation");
+        });
 
         // User Configuration
         modelBuilder.Entity<User>(entity =>
@@ -70,15 +142,37 @@ public class DeployVareDbContext : DbContext
                 .HasDatabaseName("UQ_User_Permission");
         });
 
+        // Client Configuration
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.ClientCode).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.ClientCode).IsUnique();
+            entity.Property(e => e.LicenseKey).IsRequired().HasMaxLength(32);
+            entity.HasIndex(e => e.LicenseKey).IsUnique();
+            entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+        });
+
         // Application Configuration
         modelBuilder.Entity<Application>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.HasIndex(e => e.Name).IsUnique();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+
+            // Application names are unique per client
+            entity.HasIndex(e => new { e.ClientId, e.Name })
+                .IsUnique()
+                .HasDatabaseName("UQ_Client_Application");
+
+            entity.HasOne(e => e.Client)
+                .WithMany(c => c.Applications)
+                .HasForeignKey(e => e.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // DatabaseInstance Configuration
@@ -196,6 +290,11 @@ public class DeployVareDbContext : DbContext
                 .HasForeignKey(e => e.ApplicationId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(e => e.DatabaseInstance)
+                .WithMany()
+                .HasForeignKey(e => e.DatabaseInstanceId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasIndex(e => new { e.ApplicationId, e.ServerName })
                 .IsUnique()
                 .HasDatabaseName("UQ_Application_Server");
@@ -217,6 +316,16 @@ public class DeployVareDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .HasDefaultValueSql("'Api'");
+
+            // Stored as text and defaulted in SQL, so every deployment recorded before licensing existed reads
+            // back as WithoutLicense rather than null - which is exactly what those deployments were.
+            entity.Property(e => e.LicensingMode)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'WithoutLicense'");
+            entity.Property(e => e.LicenseId).HasMaxLength(50);
+
             entity.Property(e => e.DeploymentDate).HasDefaultValueSql(nowSql);
 
             entity.HasOne(e => e.ApplicationServer)
@@ -247,6 +356,72 @@ public class DeployVareDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.ApiDeploymentId);
+        });
+
+        // AzureDevOpsConnection Configuration (one per client)
+        modelBuilder.Entity<AzureDevOpsConnection>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Organization).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Project).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.EncryptedPersonalAccessToken).IsRequired();
+            entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+
+            entity.HasIndex(e => e.ClientId).IsUnique();
+
+            entity.HasOne(e => e.Client)
+                .WithMany()
+                .HasForeignKey(e => e.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ArtifactSource Configuration (one per application + environment + server type)
+        modelBuilder.Entity<ArtifactSource>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Environment)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            entity.Property(e => e.ServerType)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            entity.Property(e => e.Repository).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Branch).IsRequired().HasMaxLength(250);
+            entity.Property(e => e.ArtifactName).HasMaxLength(200);
+            entity.Property(e => e.ArtifactSubfolder).HasMaxLength(500);
+            entity.Property(e => e.KeepOnServerPaths).HasMaxLength(4000);
+            entity.Property(e => e.SqlScriptsArtifactName).HasMaxLength(200);
+            entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(nowSql);
+
+            entity.HasIndex(e => new { e.ApplicationId, e.Environment, e.ServerType })
+                .IsUnique()
+                .HasDatabaseName("UQ_Application_Environment_ServerType");
+
+            entity.HasOne(e => e.Application)
+                .WithMany()
+                .HasForeignKey(e => e.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ServerReadinessCheck Configuration (latest report per server)
+        modelBuilder.Entity<ServerReadinessCheck>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CheckedBy).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ReportJson).IsRequired();
+
+            entity.HasIndex(e => e.ApplicationServerId).IsUnique();
+
+            entity.HasOne(e => e.ApplicationServer)
+                .WithMany()
+                .HasForeignKey(e => e.ApplicationServerId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

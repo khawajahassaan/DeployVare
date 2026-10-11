@@ -2,51 +2,70 @@
 
 @theme {
   /* Colors */
-  --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
   --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
-  --color-primary: #3b82f6;
+  --color-card-foreground: #0f172a;
+  --color-primary: #2563eb;
   --color-primary-foreground: #ffffff;
   --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0a0a0a;
+  --color-secondary-foreground: #0f172a;
   --color-muted: #f1f5f9;
   --color-muted-foreground: #64748b;
   --color-accent: #f1f5f9;
-  --color-accent-foreground: #0a0a0a;
-  --color-destructive: #ef4444;
+  --color-accent-foreground: #0f172a;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
   --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
+  --color-input: #cbd5e1;
   --color-ring: #3b82f6;
-  
+
   /* Radius */
   --radius: 0.5rem;
+
+  /* Motion */
+  --animate-fade-in: dv-fade-in 150ms ease-out;
+  --animate-dialog-in: dv-dialog-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes dv-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes dv-dialog-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0a0a0a;
-    --color-foreground: #f5f5f5;
-    --color-card: #171717;
-    --color-card-foreground: #f5f5f5;
-    --color-primary: #60a5fa;
-    --color-primary-foreground: #0a0a0a;
-    --color-secondary: #1e293b;
-    --color-secondary-foreground: #f5f5f5;
-    --color-muted: #1e293b;
-    --color-muted-foreground: #94a3b8;
-    --color-accent: #1e293b;
-    --color-accent-foreground: #f5f5f5;
-    --color-destructive: #dc2626;
-    --color-destructive-foreground: #f5f5f5;
-    --color-border: #1e293b;
-    --color-input: #1e293b;
-    --color-ring: #60a5fa;
+@layer base {
+  /* Tailwind v4 borders default to currentColor; use the theme border everywhere instead */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border);
   }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* The UI is designed for a light theme; pages still use fixed light colors in places */
+html {
+  color-scheme: light;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
 }

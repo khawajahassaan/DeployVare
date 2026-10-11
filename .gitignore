@@ -1,10 +1,15 @@
 # .NET Core / .NET 8
 API/bin/
 API/obj/
+API.Tests/bin/
+API.Tests/obj/
+_testout/
+_testresults/
 API/appsettings.Development.json
 API/appsettings.Production.json
 API/logs/
 API/publish/
+ClientPackage/output/
 API/wwwroot/uploads/
 API/wwwroot/backups/
 *.user
@@ -37,6 +42,9 @@ web/.env.production.local
 # OS
 .DS_Store
 Thumbs.db
+
+# Server setup installers (large binaries, provided locally)
+Installers/
 
 # Build outputs
 *.deb

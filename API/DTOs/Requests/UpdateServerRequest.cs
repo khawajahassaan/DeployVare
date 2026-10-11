@@ -9,6 +9,7 @@ public class UpdateServerRequest
     public string? ServerName { get; set; }
 
     [MaxLength(200)]
+    [RegularExpression(ServerHostName.Pattern, ErrorMessage = ServerHostName.ErrorMessage)]
     public string? HostName { get; set; }
 
     public int? Port { get; set; }

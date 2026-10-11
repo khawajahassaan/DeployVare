@@ -6,6 +6,7 @@ namespace API.DTOs.Requests;
 public class CreateServerRequest
 {
     [Required]
+    [Range(1, int.MaxValue, ErrorMessage = "Select an application for this server.")]
     public int ApplicationId { get; set; }
 
     [Required]
@@ -14,6 +15,7 @@ public class CreateServerRequest
 
     [Required]
     [MaxLength(200)]
+    [RegularExpression(ServerHostName.Pattern, ErrorMessage = ServerHostName.ErrorMessage)]
     public string HostName { get; set; } = string.Empty;
 
     public int Port { get; set; } = 22;

@@ -12,13 +12,19 @@ namespace API.Controllers;
 public class ApiDeploymentsController : ControllerBase
 {
     private readonly IApiDeploymentService _deploymentService;
+    private readonly IDeploymentProgressTracker _progressTracker;
+    private readonly IManualPackageService _manualPackageService;
     private readonly ILogger<ApiDeploymentsController> _logger;
 
     public ApiDeploymentsController(
         IApiDeploymentService deploymentService,
+        IDeploymentProgressTracker progressTracker,
+        IManualPackageService manualPackageService,
         ILogger<ApiDeploymentsController> logger)
     {
         _deploymentService = deploymentService;
+        _progressTracker = progressTracker;
+        _manualPackageService = manualPackageService;
         _logger = logger;
     }
 
@@ -182,6 +188,117 @@ public class ApiDeploymentsController : ControllerBase
             _logger.LogError(ex, "Error during frontend deployment");
             return StatusCode(500, new { error = "An error occurred during frontend deployment", details = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Deploy a build artifact from Azure DevOps (Dev/UAT) to a server
+    /// </summary>
+    [HttpPost("azure-artifact")]
+    public async Task<IActionResult> DeployAzureArtifact([FromBody] DeployAzureArtifactRequest request)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var nameIdentifierClaims = User.Claims
+                .Where(c => c.Type == ClaimTypes.NameIdentifier ||
+                           c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
+                .ToList();
+
+            int userId = 0;
+            foreach (var claim in nameIdentifierClaims)
+            {
+                if (int.TryParse(claim.Value, out userId))
+                {
+                    break;
+                }
+            }
+
+            if (userId == 0)
+            {
+                return Unauthorized(new { error = "Invalid user token - user ID not found" });
+            }
+
+            _logger.LogInformation("Starting Azure DevOps artifact deployment of build {BuildId} ({Environment}) to server {ServerId} by user {UserId}",
+                request.BuildId, request.Environment, request.ApplicationServerId, userId);
+
+            var result = await _deploymentService.DeployFromAzureArtifactAsync(request, userId, HttpContext.RequestAborted);
+
+            return result.Status == Models.Enums.ApiDeploymentStatus.Success
+                ? Ok(result)
+                : StatusCode(500, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Azure DevOps artifact deployment");
+            return StatusCode(500, new { error = "An error occurred during deployment", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Downloads a complete offline deployment package for the selected server: app files, installers,
+    /// Deploy.ps1 and (optionally) a baseline database. Nothing is sent to the server.
+    /// </summary>
+    [HttpPost("azure-artifact/package")]
+    [RequestSizeLimit(12_000_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 12_000_000)]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> DownloadAzureArtifactPackage([FromForm] DownloadArtifactPackageRequest request)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        try
+        {
+            var package = await _manualPackageService.BuildAsync(request, HttpContext.RequestAborted);
+
+            // Delete the file when the response has been sent, and the temporary folder afterwards
+            var workspace = Path.GetDirectoryName(package.ZipPath)!;
+            Response.OnCompleted(() =>
+            {
+                try { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Could not delete package workspace {Workspace}", workspace); }
+                return Task.CompletedTask;
+            });
+
+            var stream = new FileStream(package.ZipPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 64 * 1024, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+
+            return File(stream, "application/zip", package.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("Manual package refused: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Services.AzureDevOpsException ex)
+        {
+            _logger.LogWarning("Manual package failed: {ErrorCode} {Message}", ex.ErrorCode, ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Services.Interfaces.LicensingException ex)
+        {
+            // The operator's to fix (wrong client, expired, revoked), so it is a bad request rather than a fault
+            _logger.LogWarning("Manual package licensing failed: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error building the manual deployment package");
+            return StatusCode(500, new { error = "An error occurred while building the package", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Live progress of an Azure DevOps deployment started with this progress ID (204 until tracking has started)
+    /// </summary>
+    [HttpGet("progress/{progressId}")]
+    public IActionResult GetDeploymentProgress(string progressId)
+    {
+        var progress = _progressTracker.Get(progressId);
+        return progress == null ? NoContent() : Ok(progress);
     }
 
     /// <summary>

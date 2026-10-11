@@ -1,0 +1,63 @@
+# Multi-stage build: compile and publish .NET as self-contained
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS builder
+
+WORKDIR /app
+
+# Copy project files
+COPY ../API/*.csproj ./API/
+COPY ../API.Tests/*.csproj ./API.Tests/
+COPY *.sln ./
+
+# Restore packages
+RUN dotnet restore API/API.csproj
+
+# Copy source code
+COPY ../API ./API
+
+# Publish as self-contained (includes .NET runtime; no host dependency)
+RUN dotnet publish API/API.csproj \
+    -c Release \
+    -r linux-x64 \
+    --self-contained true \
+    -p:PublishSingleFile=true \
+    -p:PublishTrimmed=true \
+    -o /publish
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble
+
+LABEL maintainer="DeployVare Team"
+LABEL description="DeployVare API - Self-contained .NET 10 application"
+
+# Install minimal runtime dependencies for Kestrel
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libicu74 \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy self-contained binary from builder
+COPY --from=builder /publish/API /app/
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app && \
+    chmod +x /app/API
+
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Configure ASP.NET Core
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:5000
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+EXPOSE 5000
+
+ENTRYPOINT ["/app/API"]

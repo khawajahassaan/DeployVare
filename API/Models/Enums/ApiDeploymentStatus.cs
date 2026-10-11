@@ -10,7 +10,8 @@ public enum ApiDeploymentStatus
     Verifying,
     Success,
     Failed,
-    RolledBack
+    RolledBack,
+    MigratingDatabase
 }
 
 

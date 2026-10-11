@@ -26,10 +26,16 @@ public class DatabaseInstanceService : IDatabaseInstanceService
         _logger = logger;
     }
 
-    public async Task<List<DatabaseInstanceDto>> GetAllInstancesAsync()
+    public async Task<List<DatabaseInstanceDto>> GetAllInstancesAsync(int? clientId = null)
     {
-        var instances = await _context.DatabaseInstances
+        var query = _context.DatabaseInstances
             .Include(d => d.Application)
+            .AsQueryable();
+
+        if (clientId.HasValue)
+            query = query.Where(d => d.Application.ClientId == clientId.Value);
+
+        var instances = await query
             .OrderBy(d => d.Application.Name)
             .ThenBy(d => d.InstanceName)
             .ToListAsync();

@@ -43,17 +43,22 @@ public class DeploymentsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all deployments (with pagination)
+    /// Get all deployments (with pagination, optionally filtered by client)
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] int? clientId = null)
     {
         try
         {
-            var query = _context.Deployments
+            var filtered = _context.Deployments
                 .Include(d => d.DatabaseInstance)
                     .ThenInclude(di => di.Application)
-                .OrderByDescending(d => d.DeployedAt);
+                .AsQueryable();
+
+            if (clientId.HasValue)
+                filtered = filtered.Where(d => d.DatabaseInstance.Application.ClientId == clientId.Value);
+
+            var query = filtered.OrderByDescending(d => d.DeployedAt);
 
             var totalCount = await query.CountAsync();
             var deployments = await query

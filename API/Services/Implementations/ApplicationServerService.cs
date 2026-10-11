@@ -148,11 +148,17 @@ public class ApplicationServerService : IApplicationServerService
         }).ToList();
     }
 
-    public async Task<List<ApplicationServerDto>> GetAllAsync()
+    public async Task<List<ApplicationServerDto>> GetAllAsync(int? clientId = null)
     {
-        var servers = await _context.ApplicationServers
+        var query = _context.ApplicationServers
             .Include(s => s.Application)
             .Include(s => s.ApiDeployments)
+            .AsQueryable();
+
+        if (clientId.HasValue)
+            query = query.Where(s => s.Application.ClientId == clientId.Value);
+
+        var servers = await query
             .OrderBy(s => s.Application.Name)
             .ThenBy(s => s.ServerName)
             .ToListAsync();
@@ -241,10 +247,10 @@ public class ApplicationServerService : IApplicationServerService
         return true;
     }
 
-    public async Task<bool> TestConnectionAsync(int id)
+    public async Task<(bool Success, string Message)> TestConnectionAsync(int id)
     {
         var server = await _context.ApplicationServers.FindAsync(id);
-        if (server == null) return false;
+        if (server == null) return (false, "Server not found");
 
         string? password = null;
         if (!string.IsNullOrEmpty(server.EncryptedPassword))
@@ -252,7 +258,7 @@ public class ApplicationServerService : IApplicationServerService
             password = _encryptionService.Decrypt(server.EncryptedPassword);
         }
 
-        return await _sshService.TestConnectionAsync(
+        return await _sshService.TestConnectionWithReasonAsync(
             server.HostName,
             server.Port,
             server.Username,

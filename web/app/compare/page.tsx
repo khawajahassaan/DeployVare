@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import { useClientStore } from '@/store/clientStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,12 +10,16 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DiffViewer } from '@/components/DiffViewer';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import api, { DatabaseInstance, SchemaComparison, SchemaObjectDiff, ProcedureDetail } from '@/lib/api';
 import { GitCompare, Table, Database, FunctionSquare, ChevronDown, ChevronRight, ArrowRight, ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function ComparePage() {
+  const { selectedClientId } = useClientStore();
   const [instances, setInstances] = useState<DatabaseInstance[]>([]);
   const [sourceInstanceId, setSourceInstanceId] = useState<number>(0);
   const [targetInstanceId, setTargetInstanceId] = useState<number>(0);
@@ -34,26 +39,50 @@ export default function ComparePage() {
   const [selectedObject, setSelectedObject] = useState<{ objectName: string; objectType: string; schema: string } | null>(null);
   const [transferDirection, setTransferDirection] = useState<'SourceToTarget' | 'TargetToSource'>('SourceToTarget');
 
+  // .dbsnap file support
+  const [sourceType, setSourceType] = useState<'instance' | 'snap'>('instance');
+  const [targetType, setTargetType] = useState<'instance' | 'snap'>('instance');
+  const [sourceSnapFile, setSourceSnapFile] = useState<File | null>(null);
+  const [targetSnapFile, setTargetSnapFile] = useState<File | null>(null);
+  const [isSnapComparison, setIsSnapComparison] = useState(false);
+
   useEffect(() => {
-    loadInstances();
-  }, []);
+    if (selectedClientId) loadInstances();
+  }, [selectedClientId]);
 
   const loadInstances = async () => {
     try {
-      const data = await api.getDatabaseInstances();
+      const data = await api.getDatabaseInstances(selectedClientId);
       setInstances(data);
+      setSourceInstanceId(0);
+      setTargetInstanceId(0);
+      setComparison(null);
     } catch (error) {
       console.error('Failed to load instances:', error);
     }
   };
 
   const handleCompare = async () => {
-    if (!sourceInstanceId || !targetInstanceId) {
-      setError('Please select both source and target instances');
+    const srcIsSnap = sourceType === 'snap';
+    const tgtIsSnap = targetType === 'snap';
+
+    if (srcIsSnap && !sourceSnapFile) {
+      setError('Please select a source .dbsnap file');
       return;
     }
-
-    if (sourceInstanceId === targetInstanceId) {
+    if (tgtIsSnap && !targetSnapFile) {
+      setError('Please select a target .dbsnap file');
+      return;
+    }
+    if (!srcIsSnap && !sourceInstanceId) {
+      setError('Please select a source database instance');
+      return;
+    }
+    if (!tgtIsSnap && !targetInstanceId) {
+      setError('Please select a target database instance');
+      return;
+    }
+    if (!srcIsSnap && !tgtIsSnap && sourceInstanceId === targetInstanceId) {
       setError('Please select different instances to compare');
       return;
     }
@@ -61,10 +90,23 @@ export default function ComparePage() {
     setError('');
     setComparing(true);
     setComparison(null);
+    setExpandedObjects(new Set());
+    setProcedureDetails(new Map());
 
     try {
-      const result = await api.compareSchemas(sourceInstanceId, targetInstanceId);
+      let result: SchemaComparison;
+      if (!srcIsSnap && !tgtIsSnap) {
+        result = await api.compareSchemas(sourceInstanceId, targetInstanceId);
+      } else {
+        result = await api.compareWithSnap(
+          srcIsSnap ? null : sourceInstanceId,
+          srcIsSnap ? sourceSnapFile : null,
+          tgtIsSnap ? null : targetInstanceId,
+          tgtIsSnap ? targetSnapFile : null
+        );
+      }
       setComparison(result);
+      setIsSnapComparison(srcIsSnap || tgtIsSnap);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Comparison failed');
     } finally {
@@ -74,6 +116,16 @@ export default function ComparePage() {
 
   const toggleObject = async (objectName: string, objectType: 'procedure' | 'function') => {
     const key = `${objectType}:${objectName}`;
+
+    // Snap comparisons have diffs pre-populated — just toggle expand, no lazy-load needed
+    if (isSnapComparison) {
+      setExpandedObjects(prev => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+      });
+      return;
+    }
 
     if (expandedObjects.has(key)) {
       // Collapse immediately
@@ -176,10 +228,10 @@ export default function ComparePage() {
 
   const renderDiffList = (diffs: SchemaObjectDiff[], icon: React.ReactNode, objectType: 'table' | 'procedure' | 'function') => {
     if (!diffs || diffs.length === 0) {
-      return <p className="text-center text-muted-foreground py-8">No differences found</p>;
+      return <EmptyState compact icon={CheckCircle} title="No differences found" />;
     }
 
-    const showTransferButtons = objectType === 'procedure' || objectType === 'function';
+    const showTransferButtons = (objectType === 'procedure' || objectType === 'function') && !isSnapComparison;
 
     return (
       <div className="space-y-2">
@@ -192,9 +244,9 @@ export default function ComparePage() {
           return (
             <Card key={idx}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div 
-                    className="flex items-center gap-2 flex-1 cursor-pointer hover:text-primary transition-colors"
+                <div className="flex items-center justify-between gap-4">
+                  <div
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 transition-colors hover:text-primary"
                     onClick={() => {
                       if (objectType === 'table') {
                         // Tables have no lazy-load endpoint — just toggle expand in place
@@ -214,9 +266,9 @@ export default function ComparePage() {
                       <ChevronRight className="h-4 w-4" />
                     )}
                     {icon}
-                    <CardTitle className="text-base">{diff.objectName}</CardTitle>
+                    <CardTitle className="truncate">{diff.objectName}</CardTitle>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     {getDiffTypeBadge(diff.diffType)}
                     {showTransferButtons && (
                       <>
@@ -251,10 +303,7 @@ export default function ComparePage() {
                       <p className="text-sm text-muted-foreground">No changes available</p>
                     )
                   ) : isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2 text-sm text-muted-foreground">Loading details...</span>
-                    </div>
+                    <LoadingState className="py-8" label="Loading details..." />
                   ) : detail ? (
                     <div className="space-y-4">
                       <DiffViewer changes={detail.diff.split('\n')} />
@@ -298,14 +347,13 @@ export default function ComparePage() {
   ];
 
   return (
-    <ProtectedLayout>
+    <ProtectedLayout requireClient>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Schema Comparison</h1>
-          <p className="text-muted-foreground">
-            Compare database schemas between two instances
-          </p>
-        </div>
+        <PageHeader
+          title="Schema Comparison"
+          description="Compare database schemas between two instances"
+          icon={GitCompare}
+        />
 
         {/* Selection */}
         <Card>
@@ -316,70 +364,115 @@ export default function ComparePage() {
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="source">Source Instance</Label>
+                <Label htmlFor="source">Source</Label>
                 <Select
                   id="source"
-                  value={sourceInstanceId}
-                  onChange={(e) => setSourceInstanceId(parseInt(e.target.value))}
+                  value={sourceType === 'snap' ? 'snap' : String(sourceInstanceId || '0')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'snap') {
+                      setSourceType('snap');
+                    } else {
+                      setSourceType('instance');
+                      setSourceInstanceId(parseInt(val) || 0);
+                    }
+                  }}
                   disabled={comparing}
                 >
-                  <option value="0">Select source instance</option>
+                  <option value="snap">📁 Select a .dbsnap file</option>
+                  <option value="0" disabled>— or pick a live instance —</option>
                   {instances.map((instance) => (
-                    <option key={instance.id} value={instance.id}>
+                    <option key={instance.id} value={String(instance.id)}>
                       {instance.applicationName} - {instance.instanceName} (Patch #{instance.currentPatchNumber})
                     </option>
                   ))}
                 </Select>
-                {sourceInstance && (
-                  <div className="rounded-lg ring-1 ring-gray-200 p-3 bg-muted/50 text-sm shadow-sm">
+                {sourceType === 'snap' ? (
+                  <div className="space-y-1">
+                    <input
+                      type="file"
+                      accept=".dbsnap"
+                      disabled={comparing}
+                      onChange={(e) => setSourceSnapFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                    />
+                    {sourceSnapFile && (
+                      <p className="text-xs text-muted-foreground truncate">📎 {sourceSnapFile.name}</p>
+                    )}
+                  </div>
+                ) : sourceInstance ? (
+                  <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm">
                     <p className="font-medium">{sourceInstance.applicationName}</p>
                     <p className="text-muted-foreground">{sourceInstance.instanceName}</p>
                     <p className="text-muted-foreground">Patch #{sourceInstance.currentPatchNumber}</p>
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="target">Target Instance</Label>
+                <Label htmlFor="target">Target</Label>
                 <Select
                   id="target"
-                  value={targetInstanceId}
-                  onChange={(e) => setTargetInstanceId(parseInt(e.target.value))}
+                  value={targetType === 'snap' ? 'snap' : String(targetInstanceId || '0')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'snap') {
+                      setTargetType('snap');
+                    } else {
+                      setTargetType('instance');
+                      setTargetInstanceId(parseInt(val) || 0);
+                    }
+                  }}
                   disabled={comparing}
                 >
-                  <option value="0">Select target instance</option>
+                  <option value="snap">📁 Select a .dbsnap file</option>
+                  <option value="0" disabled>— or pick a live instance —</option>
                   {instances.map((instance) => (
-                    <option key={instance.id} value={instance.id}>
+                    <option key={instance.id} value={String(instance.id)}>
                       {instance.applicationName} - {instance.instanceName} (Patch #{instance.currentPatchNumber})
                     </option>
                   ))}
                 </Select>
-                {targetInstance && (
-                  <div className="rounded-lg ring-1 ring-gray-200 p-3 bg-muted/50 text-sm shadow-sm">
+                {targetType === 'snap' ? (
+                  <div className="space-y-1">
+                    <input
+                      type="file"
+                      accept=".dbsnap"
+                      disabled={comparing}
+                      onChange={(e) => setTargetSnapFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                    />
+                    {targetSnapFile && (
+                      <p className="text-xs text-muted-foreground truncate">📎 {targetSnapFile.name}</p>
+                    )}
+                  </div>
+                ) : targetInstance ? (
+                  <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm">
                     <p className="font-medium">{targetInstance.applicationName}</p>
                     <p className="text-muted-foreground">{targetInstance.instanceName}</p>
                     <p className="text-muted-foreground">Patch #{targetInstance.currentPatchNumber}</p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
             {error && (
-              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                {error}
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
 
             <Button
               onClick={handleCompare}
-              disabled={!sourceInstanceId || !targetInstanceId || comparing}
+              disabled={comparing}
               className="w-full"
             >
               {comparing ? (
                 'Comparing...'
               ) : (
                 <>
-                  <GitCompare className="mr-2 h-4 w-4" />
+                  <GitCompare className="h-4 w-4" />
                   Compare Schemas
                 </>
               )}
@@ -398,22 +491,22 @@ export default function ComparePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Tabs */}
-              <div className="flex">
+              <div className="flex flex-wrap gap-1 border-b border-border">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors',
+                      '-mb-px flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2 text-sm transition-colors',
                       activeTab === tab.key
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        ? 'border-primary bg-primary/10 font-medium text-primary'
+                        : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     )}
                   >
                     {tab.icon}
                     {tab.label}
                     {tab.count > 0 && (
-                      <Badge variant="secondary" className="ml-1">
+                      <Badge variant="secondary">
                         {tab.count}
                       </Badge>
                     )}
@@ -432,17 +525,17 @@ export default function ComparePage() {
               </div>
 
               {/* Legend */}
-              <div className="flex items-center justify-center gap-4 pt-4 text-sm">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-border pt-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-100 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 rounded shadow-sm" />
+                  <div className="h-4 w-4 rounded border border-green-300 bg-green-100 dark:border-green-700 dark:bg-green-950/30" />
                   <span className="text-muted-foreground">In Source only <span className="text-xs text-muted-foreground/60">(would be added to Target)</span></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-red-100 dark:bg-red-950/30 ring-1 ring-red-300 dark:ring-red-700 rounded shadow-sm" />
+                  <div className="h-4 w-4 rounded border border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-950/30" />
                   <span className="text-muted-foreground">In Target only <span className="text-xs text-muted-foreground/60">(would be removed from Target)</span></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-muted ring-1 ring-gray-300 rounded shadow-sm" />
+                  <div className="h-4 w-4 rounded border border-border bg-muted" />
                   <span className="text-muted-foreground">Unchanged</span>
                 </div>
               </div>
@@ -462,7 +555,7 @@ export default function ComparePage() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+            <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Source Database</p>
@@ -484,7 +577,7 @@ export default function ComparePage() {
               </div>
             </div>
 
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 text-sm">
+            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-sm dark:border-blue-900 dark:bg-blue-950/20">
               <div className="flex items-start gap-2">
                 <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                 <p className="text-blue-900 dark:text-blue-100">
@@ -493,7 +586,7 @@ export default function ComparePage() {
               </div>
             </div>
 
-            <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 p-3 text-sm">
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50/60 p-3 text-sm dark:border-yellow-900 dark:bg-yellow-950/20">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                 <p className="text-yellow-900 dark:text-yellow-100">
@@ -517,12 +610,12 @@ export default function ComparePage() {
             >
               {transferring ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Transferring...
                 </>
               ) : (
                 <>
-                  <ArrowRight className="mr-2 h-4 w-4" />
+                  <ArrowRight className="h-4 w-4" />
                   Transfer
                 </>
               )}

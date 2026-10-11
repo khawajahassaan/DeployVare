@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
 import api, { User, CreateUserRequest, UpdateUserRequest } from '@/lib/api';
-import { Plus, Edit, Trash2, Shield, User as UserIcon } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { LoadingState } from '@/components/ui/loading-state';
+import { Plus, Edit, Trash2, Shield, User as UserIcon, Users } from 'lucide-react';
 import { useAuthStore, AuthState } from '@/store/authStore';
 
 export default function UsersPage() {
@@ -149,7 +151,7 @@ export default function UsersPage() {
 
   const openDeleteDialog = (user: User) => {
     setSelectedUser(user);
-    setShowDeleteDialog(false);
+    setShowDeleteDialog(true);
   };
 
   const togglePermission = (permission: string) => {
@@ -163,50 +165,49 @@ export default function UsersPage() {
   if (loading) {
     return (
       <ProtectedLayout>
-        <div className="flex items-center justify-center h-96">
-          <p className="text-muted-foreground">Loading users...</p>
-        </div>
+        <LoadingState label="Loading users..." />
       </ProtectedLayout>
     );
   }
 
   return (
     <ProtectedLayout>
-      <div className="space-y-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">User Management</h1>
-            <p className="text-muted-foreground">Manage users and their permissions</p>
-          </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          title="User Management"
+          description="Manage users and their permissions"
+          icon={Users}
+          actions={
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" />
+              Add User
+            </Button>
+          }
+        />
 
         {error && (
-          <div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {users.map((user) => (
-            <Card key={user.id} className="shadow-md hover:shadow-lg transition-shadow">
+            <Card key={user.id} className="transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="p-3 rounded-full bg-primary/10">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="shrink-0 rounded-full bg-primary/10 p-2.5">
                       {user.role === 'Admin' ? (
-                        <Shield className="h-6 w-6 text-primary" />
+                        <Shield className="h-5 w-5 text-primary" />
                       ) : (
-                        <UserIcon className="h-6 w-6 text-muted-foreground" />
+                        <UserIcon className="h-5 w-5 text-muted-foreground" />
                       )}
                     </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg">{user.username}</h3>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-semibold text-foreground">{user.username}</h3>
                         <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'}>
                           {user.role}
                         </Badge>
@@ -220,7 +221,7 @@ export default function UsersPage() {
                       )}
                       
                       {user.email && (
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="truncate text-sm text-muted-foreground">{user.email}</p>
                       )}
                       
                       <div className="mt-3 flex flex-wrap gap-1">
@@ -241,7 +242,7 @@ export default function UsersPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-1">
                     <Button
                       variant="ghost"
                       size="sm"

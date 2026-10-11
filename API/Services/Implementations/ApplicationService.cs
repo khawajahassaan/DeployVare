@@ -18,54 +18,50 @@ public class ApplicationService : IApplicationService
         _logger = logger;
     }
 
-    public async Task<List<ApplicationDto>> GetAllApplicationsAsync()
+    public async Task<List<ApplicationDto>> GetAllApplicationsAsync(int? clientId = null)
     {
-        var applications = await _context.Applications
+        var query = _context.Applications
+            .Include(a => a.Client)
             .Include(a => a.DatabaseInstances)
+            .AsQueryable();
+
+        if (clientId.HasValue)
+            query = query.Where(a => a.ClientId == clientId.Value);
+
+        var applications = await query
             .OrderBy(a => a.Name)
             .ToListAsync();
 
-        return applications.Select(a => new ApplicationDto
-        {
-            Id = a.Id,
-            Name = a.Name,
-            Description = a.Description,
-            CreatedAt = a.CreatedAt,
-            CreatedBy = a.CreatedBy,
-            InstanceCount = a.DatabaseInstances.Count
-        }).ToList();
+        return applications.Select(MapToDto).ToList();
     }
 
     public async Task<ApplicationDto?> GetApplicationByIdAsync(int id)
     {
         var application = await _context.Applications
+            .Include(a => a.Client)
             .Include(a => a.DatabaseInstances)
             .FirstOrDefaultAsync(a => a.Id == id);
 
-        if (application == null)
-            return null;
-
-        return new ApplicationDto
-        {
-            Id = application.Id,
-            Name = application.Name,
-            Description = application.Description,
-            CreatedAt = application.CreatedAt,
-            CreatedBy = application.CreatedBy,
-            InstanceCount = application.DatabaseInstances.Count
-        };
+        return application == null ? null : MapToDto(application);
     }
 
     public async Task<ApplicationDto> CreateApplicationAsync(CreateApplicationRequest request, string createdBy)
     {
-        // Check if application already exists
-        if (await _context.Applications.AnyAsync(a => a.Name == request.Name))
+        var client = await _context.Clients.FindAsync(request.ClientId);
+        if (client == null)
         {
-            throw new InvalidOperationException($"Application '{request.Name}' already exists");
+            throw new InvalidOperationException("Please select a valid client before creating an application");
+        }
+
+        // Application names are unique per client
+        if (await _context.Applications.AnyAsync(a => a.ClientId == request.ClientId && a.Name == request.Name))
+        {
+            throw new InvalidOperationException($"Application '{request.Name}' already exists for client '{client.Name}'");
         }
 
         var application = new Application
         {
+            ClientId = request.ClientId,
             Name = request.Name,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
@@ -75,17 +71,10 @@ public class ApplicationService : IApplicationService
         _context.Applications.Add(application);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Application '{Name}' created by {User}", request.Name, createdBy);
+        _logger.LogInformation("Application '{Name}' created for client '{Client}' by {User}", request.Name, client.Name, createdBy);
 
-        return new ApplicationDto
-        {
-            Id = application.Id,
-            Name = application.Name,
-            Description = application.Description,
-            CreatedAt = application.CreatedAt,
-            CreatedBy = application.CreatedBy,
-            InstanceCount = 0
-        };
+        application.Client = client;
+        return MapToDto(application);
     }
 
     public async Task<bool> DeleteApplicationAsync(int id)
@@ -102,14 +91,30 @@ public class ApplicationService : IApplicationService
             throw new InvalidOperationException("Cannot delete application with existing database instances");
         }
 
+        if (await _context.ArtifactSources.AnyAsync(s => s.ApplicationId == id))
+        {
+            throw new InvalidOperationException("Cannot delete application with Azure DevOps artifact sources. Remove them first.");
+        }
+
         _context.Applications.Remove(application);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Application {Id} deleted", id);
         return true;
     }
+
+    private static ApplicationDto MapToDto(Application application)
+    {
+        return new ApplicationDto
+        {
+            Id = application.Id,
+            ClientId = application.ClientId,
+            ClientName = application.Client.Name,
+            Name = application.Name,
+            Description = application.Description,
+            CreatedAt = application.CreatedAt,
+            CreatedBy = application.CreatedBy,
+            InstanceCount = application.DatabaseInstances.Count
+        };
+    }
 }
-
-
-
-

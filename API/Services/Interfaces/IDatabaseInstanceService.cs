@@ -5,7 +5,7 @@ namespace API.Services.Interfaces;
 
 public interface IDatabaseInstanceService
 {
-    Task<List<DatabaseInstanceDto>> GetAllInstancesAsync();
+    Task<List<DatabaseInstanceDto>> GetAllInstancesAsync(int? clientId = null);
     Task<List<DatabaseInstanceDto>> GetInstancesByApplicationIdAsync(int applicationId);
     Task<DatabaseInstanceDto?> GetInstanceByIdAsync(int id);
     Task<DatabaseInstanceDto> CreateInstanceAsync(CreateDatabaseInstanceRequest request, string createdBy);
