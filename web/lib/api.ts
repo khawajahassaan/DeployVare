@@ -1077,6 +1077,8 @@ export const api = {
     counterpartSiteHostName?: string;
     /** The server reports its build stages under this ID (getDeploymentProgress) */
     progressId?: string;
+    /** Off leaves the offline installers out (servers that already have the prerequisites). Default on. */
+    includeInstallers?: boolean;
   }, onTransfer?: (loaded: number, total?: number) => void): Promise<{ blob: Blob; fileName: string }> {
     const form = new FormData();
     form.append('applicationServerId', String(data.applicationServerId));
@@ -1092,6 +1094,7 @@ export const api = {
     if (data.databaseName) form.append('databaseName', data.databaseName);
     if (data.certificateFile) form.append('certificateFile', data.certificateFile);
     form.append('combined', data.combined ? 'true' : 'false');
+    form.append('includeInstallers', data.includeInstallers === false ? 'false' : 'true');
     if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
     if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
     if (data.progressId) form.append('progressId', data.progressId);

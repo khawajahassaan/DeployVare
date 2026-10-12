@@ -22,6 +22,7 @@ import api, {
   ArtifactEnvironment,
   DeploymentProgress,
   DeploymentStageState,
+  InstallerFile,
   LatestBuildResult,
   License,
   ServerReadinessReport,
@@ -155,6 +156,8 @@ export default function AppDeployPage() {
   // Manual package build: stages reported by the server, then the zip arriving in the browser
   const [packageProgress, setPackageProgress] = useState<DeploymentProgress | null>(null);
   const [packageTransfer, setPackageTransfer] = useState<{ loaded: number; total?: number; startedAt: number } | null>(null);
+  const [includeInstallers, setIncludeInstallers] = useState(true);
+  const [packageInstallers, setPackageInstallers] = useState<InstallerFile[] | null>(null);
   const [downloadingPackage, setDownloadingPackage] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
   const [packageKind, setPackageKind] = useState<'single' | 'combined'>('single');
@@ -482,6 +485,9 @@ export default function AppDeployPage() {
     setCertificateMode('Default');
     setCertificateFile(null);
     setPackageKind('single');
+    setIncludeInstallers(true);
+    // Sizes for the "Include installers" choice
+    if (packageInstallers === null) api.getServerInstallers().then(setPackageInstallers).catch(() => setPackageInstallers([]));
     const preferred = counterpartServers.length === 1
       ? counterpartServers[0]
       : counterpartServers.find((s) => s.hostName === selectedServer?.hostName) ?? counterpartServers[0];
@@ -543,6 +549,7 @@ export default function AppDeployPage() {
         counterpartServerId: packageKind === 'combined' ? counterpartServerId : undefined,
         counterpartSiteHostName: packageKind === 'combined' ? counterpartSiteHostName.trim() : undefined,
         progressId: packageProgressId,
+        includeInstallers,
       }, (loaded, total) => setPackageTransfer((previous) => ({ loaded, total, startedAt: previous?.startedAt ?? Date.now() })));
 
       const url = window.URL.createObjectURL(blob);
@@ -571,6 +578,21 @@ export default function AppDeployPage() {
       setDownloadingPackage(false);
     }
   };
+
+  // Installers a package of the chosen kind would carry (the database kit has its own Hosting Bundle)
+  const packageInstallerComponents: string[] = packageKind === 'combined'
+    ? ['HostingBundle', 'DotNetSdk', 'Redis', 'UrlRewrite', 'HostingBundle', ...(freshDatabase ? ['SqlServer'] : [])]
+    : selectedServer?.serverType === 'Frontend'
+      ? ['UrlRewrite']
+      : ['HostingBundle', 'DotNetSdk', 'Redis', ...(freshDatabase ? ['SqlServer'] : [])];
+  const packageInstallerBytes = packageInstallerComponents.reduce((sum, component) => {
+    const file = packageInstallers?.find((i) => (i.component as string) === component && i.available);
+    return sum + (file?.sizeBytes ?? 0);
+  }, 0);
+  const installerLabels: Record<string, string> = {
+    HostingBundle: '.NET Hosting Bundle', DotNetSdk: '.NET SDK', Redis: 'Memurai (Redis)', UrlRewrite: 'IIS URL Rewrite', SqlServer: 'SQL Server Express',
+  };
+  const packageInstallerNames = [...new Set(packageInstallerComponents)].map((c) => installerLabels[c] ?? c).join(', ');
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -1516,6 +1538,26 @@ export default function AppDeployPage() {
                 </label>
               </div>
             )}
+
+            <label className="flex items-start gap-2 rounded-[8px] border border-border p-3">
+              <input
+                type="checkbox"
+                className="mt-1 accent-primary"
+                checked={includeInstallers}
+                onChange={(e) => setIncludeInstallers(e.target.checked)}
+                disabled={downloadingPackage}
+              />
+              <span>
+                <span className="font-medium">
+                  Include installers{packageInstallerBytes > 0 ? ` (about ${Math.round(packageInstallerBytes / (1024 * 1024))} MB)` : ''}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {includeInstallers
+                    ? `${packageInstallerNames}. Installed on the server only when missing. Untick for a much smaller package when the server already has them.`
+                    : `Not included: the server must already have ${packageInstallerNames}. Deploy.ps1 stops with a clear message if one is missing.`}
+                </span>
+              </span>
+            </label>
 
             <div className="space-y-2">
               <Label>Certificate</Label>

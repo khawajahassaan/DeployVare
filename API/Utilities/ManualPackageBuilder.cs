@@ -159,7 +159,7 @@ public static class ManualPackageBuilder
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
         text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
         text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
-        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - IIS, .NET Hosting Bundle" + (config.ServerType == "Frontend" ? ", URL Rewrite" : ", Memurai") + " must already be installed")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - " + (config.ServerType == "Frontend" ? "IIS and IIS URL Rewrite" : "IIS, the .NET Hosting Bundle, the .NET SDK and Memurai") + " must already be installed")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");
         if (!string.IsNullOrWhiteSpace(config.LicenseFileName))

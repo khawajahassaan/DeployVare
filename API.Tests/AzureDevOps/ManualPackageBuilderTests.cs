@@ -270,6 +270,19 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
+    public void Readme_SaysWhetherInstallersAreIncluded()
+    {
+        var withInstallers = ManualPackageBuilder.BuildReadme(
+            new API.Models.ManualDeployConfig { ServerName = "Dev API", ServerType = "Api", IncludesInstallers = true }, "1.0.1", Array.Empty<string>());
+        var without = ManualPackageBuilder.BuildReadme(
+            new API.Models.ManualDeployConfig { ServerName = "Dev Web", ServerType = "Frontend", IncludesInstallers = false }, "1.0.1", Array.Empty<string>());
+
+        Assert.Contains("Installers:         Included", withInstallers);
+        Assert.Contains("Not included", without);
+        Assert.Contains("URL Rewrite", without);
+    }
+
+    [Fact]
     public void CombinedFileName_IncludesBothBuilds()
     {
         Assert.Equal(
