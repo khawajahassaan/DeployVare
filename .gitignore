@@ -66,3 +66,6 @@ Installers/
 *.tmp
 *.temp
 
+
+# DeployVare server packages (contain a database backup and the encryption key)
+server-install/output/

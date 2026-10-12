@@ -1,7 +1,13 @@
 import axios from 'axios';
 
-// API Base URL - update this to match your API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5233/api';
+// API Base URL. A server install writes it into /config.js at deploy time (window.__DEPLOYVARE_CONFIG__.apiUrl),
+// so one static build works under any host name; otherwise the build-time variable, then local development.
+const BUILD_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5233/api';
+const resolveApiBaseUrl = () =>
+  (typeof window !== 'undefined'
+    ? (window as Window & { __DEPLOYVARE_CONFIG__?: { apiUrl?: string } }).__DEPLOYVARE_CONFIG__?.apiUrl
+    : undefined) || BUILD_API_URL;
+const API_BASE_URL = resolveApiBaseUrl();
 
 // Log the API URL for debugging (only in development)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -19,6 +25,9 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
+    // Read per request, so /config.js is honoured however early this module was evaluated
+    config.baseURL = resolveApiBaseUrl();
+
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

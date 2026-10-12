@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -29,6 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={sourceSans.variable}>
       <body className="font-sans">
+        {/* Runtime settings written by a server install (API address); empty in development and on Vercel */}
+        <Script src="/config.js" strategy="beforeInteractive" />
         {children}
         <Toaster position="top-right" richColors />
       </body>
