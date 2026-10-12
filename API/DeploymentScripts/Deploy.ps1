@@ -132,6 +132,16 @@ function Installer-Path([string]$Pattern) {
         Select-Object -First 1 -ExpandProperty FullName
 }
 
+# Message for a missing prerequisite with no installer in the package. A package downloaded with
+# "Include installers" unticked says so, so the fix (install it, or re-download with installers) is clear.
+function Missing-Installer([object]$Cfg, [string]$What, [string]$Usual) {
+    if ($Cfg.includesInstallers -eq $false) {
+        return "$What is not installed on this server, and this package was built without installers. " +
+               "Install $What first, or download the package again with 'Include installers' ticked."
+    }
+    return $Usual
+}
+
 function Invoke-KnownInstaller([string]$File, [int]$TimeoutMinutes) {
     if (-not $File) { throw 'Installer path is empty.' }
     $installersRoot = [IO.Path]::GetFullPath((Join-Path $PackageRoot 'installers'))
@@ -196,7 +206,7 @@ function Ensure-DotNetRuntime([object]$Cfg) {
         return
     }
     $file = Installer-Path 'dotnet-hosting-*-win.exe'
-    if (-not $file) { Fail ".NET $major runtime is missing and no Hosting Bundle installer is in the package installers folder." }
+    if (-not $file) { Fail (Missing-Installer $Cfg ".NET $major (Hosting Bundle or runtime)" ".NET $major runtime is missing and no Hosting Bundle installer is in the package installers folder.") }
     Write-Step "Installing .NET $major runtime via the Hosting Bundle ($([IO.Path]::GetFileName($file)))..."
     Invoke-KnownInstaller $file 30
     Write-Step "[OK] .NET $major runtime installed"
@@ -221,7 +231,7 @@ function Ensure-DotNet([object]$Cfg) {
     $hasRuntime = $runtimes | Where-Object { ($_ -split '\.')[0] -eq "$major" }
     if (-not $hasRuntime -or -not $moduleOk) {
         $file = Installer-Path 'dotnet-hosting-*-win.exe'
-        if (-not $file) { Fail ".NET $major Hosting Bundle is missing and no installer is in the package installers folder." }
+        if (-not $file) { Fail (Missing-Installer $Cfg "the .NET $major Hosting Bundle" ".NET $major Hosting Bundle is missing and no installer is in the package installers folder.") }
         Write-Step "Installing .NET $major Hosting Bundle ($([IO.Path]::GetFileName($file)))..."
         Invoke-KnownInstaller $file 30
         net stop was /y | Out-Null
@@ -235,7 +245,7 @@ function Ensure-DotNet([object]$Cfg) {
     $sdkOk = $sdks | Where-Object { [int](($_ -split '\.')[0]) -ge $minSdk }
     if (-not $sdkOk) {
         $file = Installer-Path 'dotnet-sdk-*-win-x64.exe'
-        if (-not $file) { Fail "No .NET SDK $minSdk or newer is installed and no SDK installer is in the package." }
+        if (-not $file) { Fail (Missing-Installer $Cfg ".NET SDK $minSdk or newer" "No .NET SDK $minSdk or newer is installed and no SDK installer is in the package.") }
         Write-Step "Installing .NET SDK ($([IO.Path]::GetFileName($file)))..."
         Invoke-KnownInstaller $file 30
         Write-Step '[OK] .NET SDK installed'
@@ -256,7 +266,7 @@ function Ensure-UrlRewrite([object]$Cfg) {
         return
     }
     $file = Installer-Path 'rewrite_amd64*.msi'
-    if (-not $file) { Fail 'IIS URL Rewrite is not installed and rewrite_amd64*.msi is not in the package installers folder.' }
+    if (-not $file) { Fail (Missing-Installer $Cfg 'IIS URL Rewrite' 'IIS URL Rewrite is not installed and rewrite_amd64*.msi is not in the package installers folder.') }
     Write-Step "Installing IIS URL Rewrite ($([IO.Path]::GetFileName($file)))..."
     Invoke-KnownInstaller $file 15
     Write-Step '[OK] IIS URL Rewrite installed'
@@ -301,7 +311,7 @@ function Ensure-Memurai([object]$Cfg) {
     }
     $file = Installer-Path 'Memurai*.msi'
     if (-not $file) { $file = Installer-Path 'Redis-x64-*.msi' }
-    if (-not $file) { Fail 'Memurai / Redis is not installed and no Memurai*.msi installer is in the package.' }
+    if (-not $file) { Fail (Missing-Installer $Cfg 'Memurai (Redis)' 'Memurai / Redis is not installed and no Memurai*.msi installer is in the package.') }
     Write-Step "Installing Memurai (Redis $($Cfg.requiredRedisMajor) on port $port) ($([IO.Path]::GetFileName($file)))..."
     Stop-ListenersOnRedisPort $port
     Invoke-KnownInstaller $file 15
@@ -461,7 +471,7 @@ function Ensure-SqlServer([object]$Cfg) {
     $file = Installer-Path 'SQLEXPR_x64*.exe'
     if (-not $file) { $file = Installer-Path 'SQL*SSEI*Expr*.exe' }
     if (-not $file) {
-        Fail "SQL Server is not installed. Put SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the package installers folder."
+        Fail (Missing-Installer $Cfg 'SQL Server' "SQL Server is not installed. Put SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the package installers folder.")
     }
     Write-Host 'SQL Server Express is not installed. Enter the sa password for a mixed-mode install (not logged).'
     $secure = Read-Host 'sa password' -AsSecureString

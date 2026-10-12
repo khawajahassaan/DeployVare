@@ -273,6 +273,7 @@ public class ManualPackageService : IManualPackageService
             SiteHostName = siteHostName,
             SqlInstanceName = source.SqlInstanceName,
             DatabaseName = source.DatabaseName,
+            IncludeInstallers = source.IncludeInstallers,
             Combined = false
         };
     }
@@ -321,7 +322,9 @@ public class ManualPackageService : IManualPackageService
 
         // With a separate database kit, SQL Express and the baseline backup travel in that kit instead
         var packsDatabase = request.FreshDatabase && !isFrontend && !separateDatabase;
-        CollectInstallers(isFrontend, packsDatabase, extraFiles);
+        if (request.IncludeInstallers)
+            CollectInstallers(isFrontend, packsDatabase, extraFiles);
+        // The baseline backup is data, not an installer: Fresh Database needs it either way
         if (packsDatabase)
             CollectBaselineBackup(extraFiles);
 
@@ -432,6 +435,7 @@ public class ManualPackageService : IManualPackageService
                 LicensingMode = request.LicensingMode.ToString(),
                 LicenseFileName = licenseFile?.FileName,
                 HasScripts = scriptsDirectory != null,
+                IncludesInstallers = request.IncludeInstallers,
                 ContentFolders = contentFolders.Select(f => f.Name).ToList(),
                 RequiredDotNetMajor = _setupOptions.RequiredDotNetMajorVersion,
                 MinimumSdkMajor = _setupOptions.MinimumSdkMajorVersion,
@@ -622,13 +626,14 @@ public class ManualPackageService : IManualPackageService
         File.WriteAllText(apiConfigPath, JsonSerializer.Serialize(apiConfig, ConfigJson), new UTF8Encoding(false));
 
         var installers = new List<(string EntryName, string SourcePath)>();
-        if (hasScripts)
+        if (hasScripts && request.IncludeInstallers)
             AddInstaller(ServerComponent.HostingBundle, installers, required: true,
                 "Add the .NET 10 Hosting Bundle (dotnet-hosting-*-win.exe) to the Installers folder; DbMigrator needs the .NET runtime.");
         if (request.FreshDatabase)
         {
-            AddInstaller(ServerComponent.SqlServer, installers, required: true,
-                "Fresh Database needs SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the Installers folder.");
+            if (request.IncludeInstallers)
+                AddInstaller(ServerComponent.SqlServer, installers, required: true,
+                    "Fresh Database needs SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the Installers folder.");
             var backup = FindBaselineBackup();
             installers.Add(($"{ManualPackageBuilder.BackupFolder}/{Path.GetFileName(backup)}", backup));
         }
@@ -649,6 +654,7 @@ public class ManualPackageService : IManualPackageService
             SqlDataSource = string.IsNullOrWhiteSpace(apiConfig.SqlDataSource) ? $@".\{sqlInstance}" : apiConfig.SqlDataSource,
             DatabaseName = string.IsNullOrWhiteSpace(apiConfig.DatabaseName) ? "AuditVare" : apiConfig.DatabaseName,
             HasScripts = hasScripts,
+            IncludesInstallers = request.IncludeInstallers,
             DbMigratorFolder = hasScripts ? ManualPackageBuilder.DbMigratorFolder : null,
             RequiredDotNetMajor = _setupOptions.RequiredDotNetMajorVersion,
             MinimumSdkMajor = _setupOptions.MinimumSdkMajorVersion,

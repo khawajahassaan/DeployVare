@@ -154,7 +154,7 @@ export default function AppDeployPage() {
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
   // Manual package build: stages reported by the server, then the zip arriving in the browser
   const [packageProgress, setPackageProgress] = useState<DeploymentProgress | null>(null);
-  const [packageTransfer, setPackageTransfer] = useState<{ loaded: number; total?: number } | null>(null);
+  const [packageTransfer, setPackageTransfer] = useState<{ loaded: number; total?: number; startedAt: number } | null>(null);
   const [downloadingPackage, setDownloadingPackage] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
   const [packageKind, setPackageKind] = useState<'single' | 'combined'>('single');
@@ -543,7 +543,7 @@ export default function AppDeployPage() {
         counterpartServerId: packageKind === 'combined' ? counterpartServerId : undefined,
         counterpartSiteHostName: packageKind === 'combined' ? counterpartSiteHostName.trim() : undefined,
         progressId: packageProgressId,
-      }, (loaded, total) => setPackageTransfer({ loaded, total }));
+      }, (loaded, total) => setPackageTransfer((previous) => ({ loaded, total, startedAt: previous?.startedAt ?? Date.now() })));
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

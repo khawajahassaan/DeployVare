@@ -37,6 +37,9 @@ public class ManualDeployConfig
     public string LicensingMode { get; set; } = "WithoutLicense";
     public string? LicenseFileName { get; set; }
     public bool HasScripts { get; set; }
+
+    /// <summary>False when the package was built without installers: missing prerequisites must be installed by hand.</summary>
+    public bool IncludesInstallers { get; set; } = true;
     public List<string> ContentFolders { get; set; } = new();
     public int RequiredDotNetMajor { get; set; } = 10;
     public int MinimumSdkMajor { get; set; } = 8;

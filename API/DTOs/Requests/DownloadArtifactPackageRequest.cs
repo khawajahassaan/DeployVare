@@ -54,6 +54,12 @@ public class DownloadArtifactPackageRequest
     /// </summary>
     public bool Combined { get; set; }
 
+    /// <summary>
+    /// Adds the offline installers (.NET Hosting Bundle, SDK, Memurai, URL Rewrite, SQL Express). Off makes a much smaller
+    /// package for servers that already have the prerequisites. Defaults to on, the package as it always was.
+    /// </summary>
+    public bool IncludeInstallers { get; set; } = true;
+
     /// <summary>Client-generated ID; the build reports its stages under it (GET apideployments/progress/{id}).</summary>
     [MaxLength(64)]
     public string? ProgressId { get; set; }

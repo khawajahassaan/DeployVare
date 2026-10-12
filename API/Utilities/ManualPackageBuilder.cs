@@ -159,6 +159,7 @@ public static class ManualPackageBuilder
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
         text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
         text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - IIS, .NET Hosting Bundle" + (config.ServerType == "Frontend" ? ", URL Rewrite" : ", Memurai") + " must already be installed")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");
         if (!string.IsNullOrWhiteSpace(config.LicenseFileName))
@@ -415,6 +416,7 @@ exit 0
         text.AppendLine($"Database:           {config.DatabaseName}");
         text.AppendLine($"Database Mode:      {(config.FreshDatabase ? "Fresh Database (installs SQL Express if needed, restores the baseline backup)" : "Existing Database (must already exist)")}");
         text.AppendLine($"SQL scripts:        {sqlFileCount} (run by DbMigrator)");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (.NET runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ")" : "Not included - the .NET 10 runtime" + (config.FreshDatabase ? " and SQL Server" : "") + " must already be installed")}");
         text.AppendLine();
         text.AppendLine("Instructions:");
         text.AppendLine("  1. Copy this folder to the database server (or the single server for an all-in-one install).");

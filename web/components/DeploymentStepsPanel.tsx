@@ -23,8 +23,8 @@ interface DeploymentStepsPanelProps {
   buildError?: string;
   /** Stages the server reports while it builds the package */
   packageProgress?: DeploymentProgress | null;
-  /** Bytes of the finished zip received by the browser */
-  packageTransfer?: { loaded: number; total?: number } | null;
+  /** Bytes of the finished zip received by the browser, and when the first byte arrived */
+  packageTransfer?: { loaded: number; total?: number; startedAt: number } | null;
 }
 
 const formatBytes = (bytes: number) =>
@@ -47,7 +47,7 @@ function StageIcon({ state }: { state: DeploymentStageState }) {
 }
 
 /** Real build progress: the server's stages, then the zip arriving in the browser. */
-function BuildingProgress({ progress, transfer }: { progress?: DeploymentProgress | null; transfer?: { loaded: number; total?: number } | null }) {
+function BuildingProgress({ progress, transfer }: { progress?: DeploymentProgress | null; transfer?: { loaded: number; total?: number; startedAt: number } | null }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   // Ticks once a second, so a running stage's timer moves between polls
   const [now, setNow] = useState(() => new Date().getTime());
@@ -65,15 +65,27 @@ function BuildingProgress({ progress, transfer }: { progress?: DeploymentProgres
   const sendState: DeploymentStageState = transfer && transfer.total && transfer.loaded >= transfer.total
     ? 'Succeeded'
     : serverDone || (transfer && transfer.loaded > 0) ? 'Running' : 'Pending';
+  // Speed over the whole transfer so far; the remaining time follows from it
+  const transferSeconds = transfer ? Math.max(1, (now - transfer.startedAt) / 1000) : 0;
+  const bytesPerSecond = transfer && transfer.loaded > 0 ? transfer.loaded / transferSeconds : 0;
+  const remainingSeconds = transfer?.total && bytesPerSecond > 0 ? (transfer.total - transfer.loaded) / bytesPerSecond : null;
   const sendDetail = transfer && transfer.loaded > 0
-    ? transfer.total
-      ? `${formatBytes(transfer.loaded)} of ${formatBytes(transfer.total)} (${Math.floor((transfer.loaded * 100) / transfer.total)}%)`
-      : `${formatBytes(transfer.loaded)} received`
+    ? [
+        transfer.total
+          ? `${formatBytes(transfer.loaded)} of ${formatBytes(transfer.total)} (${Math.floor((transfer.loaded * 100) / transfer.total)}%)`
+          : `${formatBytes(transfer.loaded)} received`,
+        bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : null,
+        remainingSeconds !== null && transfer.loaded < (transfer.total ?? 0) ? `about ${formatDuration(remainingSeconds)} left` : null,
+      ].filter(Boolean).join(' · ')
     : serverDone ? 'Starting the download…' : null;
 
   const stages: { key: string; label: string; state: DeploymentStageState; detail?: string | null; startedAt?: string | null; completedAt?: string | null }[] = [
     ...(progress?.stages ?? []),
-    { key: 'send', label: 'Send the package to your browser', state: sendState, detail: sendDetail },
+    {
+      key: 'send', label: 'Send the package to your browser', state: sendState, detail: sendDetail,
+      startedAt: transfer ? new Date(transfer.startedAt).toISOString() : null,
+      completedAt: sendState === 'Succeeded' ? new Date(now).toISOString() : null,
+    },
   ];
 
   return (
