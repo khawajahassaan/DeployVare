@@ -531,11 +531,39 @@ function Test-CertForServers([System.Security.Cryptography.X509Certificates.X509
     return @($eku.EnhancedKeyUsages | ForEach-Object { $_.Value }) -contains '1.3.6.1.5.5.7.3.1'
 }
 
+# Personal (My) and Web Hosting stores: IIS Manager can import a certificate into either.
+$CertStores = @('My', 'WebHosting')
+
+function Find-CertByThumbprint([string]$Thumbprint) {
+    foreach ($store in $CertStores) {
+        $cert = Get-Item -LiteralPath "Cert:\LocalMachine\$store\$Thumbprint" -ErrorAction SilentlyContinue
+        if ($cert) { return [pscustomobject]@{ Cert = $cert; Store = $store } }
+    }
+    return $null
+}
+
 function Get-UsableCertificates {
     $now = Get-Date
-    return @(Get-ChildItem Cert:\LocalMachine\My | Where-Object {
-        $_.HasPrivateKey -and $_.NotBefore -le $now -and $_.NotAfter -gt $now -and (Test-CertForServers $_)
+    return @(foreach ($store in $CertStores) {
+        Get-ChildItem "Cert:\LocalMachine\$store" -ErrorAction SilentlyContinue | Where-Object {
+            $_.HasPrivateKey -and $_.NotBefore -le $now -and $_.NotAfter -gt $now -and (Test-CertForServers $_)
+        }
     })
+}
+
+# Certificate already bound to the site's host name, when it still covers the host and has not expired
+# (-AnyName: also one that does not cover it, so a deliberate choice is not swapped for the self-signed default).
+function Get-BoundHostCertificate([object]$Cfg, [switch]$AnyName) {
+    $hostName = [string]$Cfg.siteHostName
+    $port = if ([int]$Cfg.httpsPort -gt 0) { [int]$Cfg.httpsPort } else { 443 }
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+    $binding = Get-Item -Path "IIS:\SslBindings\!${port}!$hostName" -ErrorAction SilentlyContinue
+    if (-not $binding -or -not $binding.Thumbprint) { return $null }
+    $found = Find-CertByThumbprint $binding.Thumbprint
+    if (-not $found) { return $null }
+    $cert = $found.Cert
+    if ($cert.HasPrivateKey -and $cert.NotAfter -gt (Get-Date) -and ($AnyName -or (Test-CertCoversHost $cert $hostName))) { return $cert }
+    return $null
 }
 
 # Best certificate for the host: covers it and is trusted, else covers it (e.g. an internal CA). Latest expiry wins.
@@ -606,15 +634,22 @@ function Ensure-Certificate([object]$Cfg) {
         return $cert.Thumbprint
     }
 
-    # Default: a certificate already on this server that covers the host name
+    # Default: keep a good certificate the site already has (bound by hand or by an earlier deploy), unless a newer
+    # one covering the host is installed (a renewal); otherwise pick one on this server that covers the host name
+    $bound = Get-BoundHostCertificate $Cfg
     $cert = Find-HostCertificate $hostName
+    if ($bound -and (-not $cert -or $cert.NotAfter -le $bound.NotAfter)) {
+        Write-Step "[OK] Keeping the certificate already bound to ${hostName}: $(Describe-Cert $bound)"
+        return $bound.Thumbprint
+    }
     if ($cert) {
         $trust = if (Test-CertTrusted $cert) { 'trusted' } else { 'not trusted by this server - check the issuing CA' }
         Write-Step "[OK] Using certificate for ${hostName}: $(Describe-Cert $cert), $trust"
         return $cert.Thumbprint
     }
 
-    $fallback = Get-FallbackCertificate $Cfg
+    $fallback = Get-BoundHostCertificate $Cfg -AnyName
+    if (-not $fallback) { $fallback = Get-FallbackCertificate $Cfg }
     $ask = (-not $UseDefaults) -and [Environment]::UserInteractive
     Write-Host ''
     Write-Host "  No certificate for $hostName is installed on this server."
@@ -658,8 +693,9 @@ function Ensure-Bindings([object]$Cfg, [string]$Thumbprint) {
     $httpsPort = if ([int]$Cfg.httpsPort -gt 0) { [int]$Cfg.httpsPort } else { 443 }
 
     if (-not (Get-Website | Where-Object { $_.Name -eq $siteName })) { Fail "Site $siteName does not exist" }
-    $cert = Get-Item -LiteralPath "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction SilentlyContinue
-    if (-not $cert) { Fail "Certificate $Thumbprint was not found in LocalMachine\My" }
+    $found = Find-CertByThumbprint $Thumbprint
+    if (-not $found) { Fail "Certificate $Thumbprint was not found in LocalMachine\My or WebHosting" }
+    $cert = $found.Cert
     if (-not $cert.HasPrivateKey) { Fail 'The selected certificate has no private key' }
 
     if (-not (Get-WebBinding -Name $siteName -Protocol 'http' -Port 80 -HostHeader $hostName)) {
@@ -689,7 +725,7 @@ function Ensure-Bindings([object]$Cfg, [string]$Thumbprint) {
         $existing = $null
     }
     if (-not $existing) {
-        $https.AddSslCertificate($Thumbprint, 'My')
+        $https.AddSslCertificate($Thumbprint, $found.Store)
         Write-Step "Bound certificate to https://${hostName}:${httpsPort}"
     }
 }
