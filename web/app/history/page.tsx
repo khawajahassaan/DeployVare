@@ -223,7 +223,7 @@ export default function HistoryPage() {
                   {/* Patches */}
                   {selectedDeployment.patches && selectedDeployment.patches.length > 0 && (
                     <div>
-                      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
+                      <h3 className="mb-3 flex items-center gap-2 text-[16px] font-normal text-ink">
                         <FileText className="h-4 w-4" />
                         SQL Patches ({selectedDeployment.patches.length})
                       </h3>
@@ -257,7 +257,7 @@ export default function HistoryPage() {
                   {/* Objects (Procedures/Functions) */}
                   {selectedDeployment.objects && selectedDeployment.objects.length > 0 && (
                     <div>
-                      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
+                      <h3 className="mb-3 flex items-center gap-2 text-[16px] font-normal text-ink">
                         <Database className="h-4 w-4" />
                         Database Objects ({selectedDeployment.objects.length})
                       </h3>

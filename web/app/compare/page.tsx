@@ -394,7 +394,7 @@ export default function ComparePage() {
                       accept=".dbsnap"
                       disabled={comparing}
                       onChange={(e) => setSourceSnapFile(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-normal file:text-brand-blue hover:file:bg-[#D6E6F4] disabled:opacity-50"
                     />
                     {sourceSnapFile && (
                       <p className="text-xs text-muted-foreground truncate">📎 {sourceSnapFile.name}</p>
@@ -440,7 +440,7 @@ export default function ComparePage() {
                       accept=".dbsnap"
                       disabled={comparing}
                       onChange={(e) => setTargetSnapFile(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-normal file:text-brand-blue hover:file:bg-[#D6E6F4] disabled:opacity-50"
                     />
                     {targetSnapFile && (
                       <p className="text-xs text-muted-foreground truncate">📎 {targetSnapFile.name}</p>
@@ -499,7 +499,7 @@ export default function ComparePage() {
                     className={cn(
                       '-mb-px flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2 text-sm transition-colors',
                       activeTab === tab.key
-                        ? 'border-primary bg-primary/10 font-medium text-primary'
+                        ? 'border-brand-blue bg-accent text-brand-blue'
                         : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     )}
                   >

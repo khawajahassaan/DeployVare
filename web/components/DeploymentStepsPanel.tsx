@@ -50,7 +50,7 @@ function BuildingProgress({ currentStep = 'frontend' }: BuildingProgressProps) {
     <div className="w-96 bg-slate-50 border-l border-border overflow-y-auto flex flex-col">
       <div className="p-6 space-y-6 flex-1">
         <div>
-          <h3 className="font-semibold text-lg mb-1">Building Package</h3>
+          <h3 className="mb-1 text-[18px] font-normal text-ink">Building Package</h3>
           <p className="text-xs text-muted-foreground">Preparing your deployment package</p>
         </div>
 
@@ -64,7 +64,7 @@ function BuildingProgress({ currentStep = 'frontend' }: BuildingProgressProps) {
                 key={step.id}
                 className={`rounded-lg border p-4 transition-colors ${
                   isActive
-                    ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
+                    ? 'border-brand-blue/50 bg-accent ring-1 ring-brand-blue/20'
                     : isCompleted
                       ? 'border-emerald-200 bg-emerald-50'
                       : 'border-border bg-white'
@@ -111,7 +111,7 @@ function BuildingError({ error }: { error: string }) {
     <div className="w-96 bg-slate-50 border-l border-border overflow-y-auto flex flex-col">
       <div className="p-6 space-y-6 flex-1">
         <div>
-          <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
+          <h3 className="mb-1 flex items-center gap-2 text-[18px] font-normal text-ink">
             <AlertTriangle className="h-5 w-5 text-red-600" />
             Build Failed
           </h3>
@@ -151,7 +151,7 @@ export function DeploymentStepsPanel({ steps, currentStepId, isBuilding, buildEr
     <div className="w-96 bg-slate-50 border-l border-border overflow-y-auto flex flex-col">
       <div className="p-6 space-y-6 flex-1">
         <div>
-          <h3 className="font-semibold text-lg mb-1">Deployment Steps</h3>
+          <h3 className="mb-1 text-[18px] font-normal text-ink">Deployment Steps</h3>
           <p className="text-xs text-muted-foreground">Follow the steps to deploy your application</p>
         </div>
 
@@ -166,7 +166,7 @@ export function DeploymentStepsPanel({ steps, currentStepId, isBuilding, buildEr
                 key={step.id}
                 className={`rounded-lg border p-4 transition-colors ${
                   isCurrent
-                    ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
+                    ? 'border-brand-blue/50 bg-accent ring-1 ring-brand-blue/20'
                     : isCompleted
                       ? 'border-emerald-200 bg-emerald-50'
                       : isError

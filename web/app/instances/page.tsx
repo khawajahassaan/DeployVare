@@ -136,7 +136,7 @@ function InstancesContent() {
           <div className="space-y-6">
             {groupedInstances.map(({ application, instances }) => (
               <div key={application.id}>
-                <h2 className="text-base font-semibold text-foreground mb-3">{application.name}</h2>
+                <h2 className="text-[16px] font-normal text-ink mb-3">{application.name}</h2>
                 {instances.length === 0 ? (
                   <EmptyState compact title="No instances for this application" />
                 ) : (

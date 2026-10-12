@@ -76,12 +76,12 @@ export default function DashboardPage() {
           {stats.map(({ title, value, caption, icon: Icon }) => (
             <Card key={title}>
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                <div className="rounded-[8px] bg-accent p-2 text-brand-blue">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                  <div className="text-2xl font-semibold text-foreground">{value}</div>
+                  <div className="text-[24px] font-normal leading-tight text-ink">{value}</div>
                   <p className="text-xs text-muted-foreground">{caption}</p>
                 </div>
               </CardContent>

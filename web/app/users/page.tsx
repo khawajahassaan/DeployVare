@@ -197,9 +197,9 @@ export default function UsersPage() {
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <div className="shrink-0 rounded-full bg-primary/10 p-2.5">
+                    <div className="shrink-0 rounded-full bg-accent p-2.5">
                       {user.role === 'Admin' ? (
-                        <Shield className="h-5 w-5 text-primary" />
+                        <Shield className="h-5 w-5 text-brand-blue" />
                       ) : (
                         <UserIcon className="h-5 w-5 text-muted-foreground" />
                       )}
@@ -207,7 +207,7 @@ export default function UsersPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-foreground">{user.username}</h3>
+                        <h3 className="truncate text-[16px] font-normal text-ink">{user.username}</h3>
                         <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'}>
                           {user.role}
                         </Badge>

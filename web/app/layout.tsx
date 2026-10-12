@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+// Same typeface AuditVare ships; bundled locally so the desktop app works offline
+const sourceSans = localFont({
+  src: [
+    { path: "./fonts/SourceSans3-Light.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/SourceSans3-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/SourceSans3-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/SourceSans3-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/SourceSans3-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-source-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "DeployVare",
@@ -16,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={sourceSans.variable}>
+      <body className="font-sans">
         {children}
         <Toaster position="top-right" richColors />
       </body>

@@ -5,12 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { useClientStore } from '@/store/clientStore';
-import { useUiStore } from '@/store/uiStore';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Building2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import Navigation from './Navigation';
 
 interface ProtectedLayoutProps {
@@ -23,7 +21,6 @@ export default function ProtectedLayout({ children, requireClient = false }: Pro
   const router = useRouter();
   const { isAuthenticated, checkAuth } = useAuthStore();
   const { selectedClientId, loaded, loadClients } = useClientStore();
-  const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
 
   useEffect(() => {
     checkAuth();
@@ -68,16 +65,11 @@ export default function ProtectedLayout({ children, requireClient = false }: Pro
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dv-canvas min-h-screen">
       <Navigation />
-      {/* Content always sits beside the sidebar, with the same width and alignment on every page */}
-      <main
-        className={cn(
-          'pt-16 transition-[padding] duration-300',
-          sidebarCollapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-64'
-        )}
-      >
-        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      {/* Content sits on the canvas beside the 50px icon rail and under the 36px bar */}
+      <main className="pt-[var(--dv-header-h)] lg:pl-[50px]">
+        <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
           {renderContent()}
         </div>
       </main>

@@ -1,24 +1,39 @@
 @import "tailwindcss";
 
+/* Design tokens follow the AuditVare (TransVare) design system so both products look
+   like one family: Source Sans 3, navy #01274E actions, #0F6CBD accent, #CECECE field
+   borders and the soft blue-to-pink canvas. */
 @theme {
+  --font-sans: var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+
   /* Colors */
-  --color-background: #f8fafc;
-  --color-foreground: #0f172a;
+  --color-background: #f7f8fa;
+  --color-foreground: #333333;
   --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
-  --color-primary: #2563eb;
+  --color-card-foreground: #333333;
+  --color-primary: #01274e;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0f172a;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #0f172a;
-  --color-destructive: #dc2626;
+  --color-secondary: #dde4e8;
+  --color-secondary-foreground: #01274e;
+  --color-muted: #f1f4f7;
+  --color-muted-foreground: #585d6e;
+  --color-accent: #eaf3fb;
+  --color-accent-foreground: #0f6cbd;
+  --color-destructive: #e30c0c;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e2e8f0;
-  --color-input: #cbd5e1;
-  --color-ring: #3b82f6;
+  --color-border: #e6eaef;
+  --color-input: #cecece;
+  --color-ring: #0f6cbd;
+
+  /* AuditVare palette, for places that need the exact brand shades */
+  --color-brand-blue: #0f6cbd;
+  --color-brand-purple: #520b4d;
+  --color-brand-hover: #34a3d3;
+  --color-ink: #242424;
+  --color-label: #616161;
+  --color-nav-idle: #9dabb9;
+  --color-disabled: #dde4e8;
+  --color-disabled-foreground: #9dabb9;
 
   /* Radius */
   --radius: 0.5rem;
@@ -36,6 +51,12 @@
     from { opacity: 0; transform: translateY(8px) scale(0.98); }
     to { opacity: 1; transform: none; }
   }
+}
+
+:root {
+  /* AuditVare default workspace canvas (theme "lg2") */
+  --dv-canvas: linear-gradient(180deg, #e2eff7 0%, #e8e8f0 51%, #f5dde1 100%);
+  --dv-header-h: 36px;
 }
 
 @layer base {
@@ -62,10 +83,81 @@ html {
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* The signed-in shell paints the canvas; the login page stays white like AuditVare's */
+.dv-canvas {
+  background: var(--dv-canvas);
+  background-attachment: fixed;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Data tables: navy header with white text and rounded top corners, like AuditVare's
+   shared Table component */
+.dv-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dv-table thead th {
+  background: #01274e;
+  color: #ffffff;
+  font-weight: 400;
+  border-bottom: 0;
+}
+
+.dv-table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.dv-table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+.dv-table tbody td {
+  color: #585d6e;
+  background: #ffffff;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.dv-table tbody tr:hover td {
+  background: #fafafa;
+}
+
+/* Chevron for native selects, drawn like AuditVare's Select arrow (#484A4A) */
+.dv-select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23484A4A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  background-position: right 11px center;
+}
+
+.dv-select-chevron-sm {
+  background-size: 10px 10px;
+  background-position: right 8px center;
+}
+
+/* Dark fields (login page): stop browser autofill from repainting them light blue */
+.dv-dark-field:-webkit-autofill,
+.dv-dark-field:-webkit-autofill:hover,
+.dv-dark-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.85);
+  -webkit-box-shadow: 0 0 0 1000px #232327 inset;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-out;
 }

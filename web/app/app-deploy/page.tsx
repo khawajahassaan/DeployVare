@@ -125,7 +125,7 @@ const segmentClass = (active: boolean) =>
   }`;
 
 const fileInputClass =
-  'block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50';
+  'block w-full text-sm text-muted-foreground file:mr-4 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-normal file:text-brand-blue hover:file:bg-[#D6E6F4] disabled:opacity-50';
 
 // Step log lines are prefixed by the server with ✓ / ⚠ / ✗ / ⊘
 function StepIcon({ step }: { step: string }) {
@@ -905,7 +905,7 @@ export default function AppDeployPage() {
                                   <label
                                     key={artifact.name}
                                     className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition-colors ${
-                                      selectedArtifact === artifact.name ? 'border-primary bg-primary/5' : 'border-border'
+                                      selectedArtifact === artifact.name ? 'border-brand-blue bg-accent' : 'border-border'
                                     } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-muted/40'}`}
                                   >
                                     <span className="flex items-center gap-2">
@@ -1315,8 +1315,8 @@ export default function AppDeployPage() {
                       Deployed Files ({deploymentResult.deployedFiles.length}):
                     </p>
                     <div className="max-h-96 overflow-auto rounded-lg border border-border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <table className="dv-table text-[14px]">
+                        <thead className="text-left text-[13px]">
                           <tr>
                             <th className="px-3 py-2 text-left">File</th>
                             <th className="px-3 py-2 text-right">Size</th>

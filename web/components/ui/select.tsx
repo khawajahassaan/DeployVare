@@ -3,12 +3,13 @@ import { cn } from "@/lib/utils"
 
 export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>
 
+// Native select drawn like AuditVare's Select box: 40px, #CECECE border, #484A4A chevron
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
     return (
       <select
         className={cn(
-          "flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs transition-colors hover:border-slate-400 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full appearance-none rounded-[6px] border border-input dv-select-chevron bg-white py-1 pl-[11px] pr-8 text-[14px] text-foreground transition-colors hover:border-[#333333] focus-visible:border-[#333333] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60",
           className
         )}
         ref={ref}

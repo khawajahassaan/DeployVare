@@ -742,8 +742,8 @@ function ServerSetupContent() {
             <CardContent className="space-y-5">
               {report.bindings.length > 0 && (
                 <div className="overflow-x-auto rounded-lg border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <table className="dv-table text-[14px]">
+                    <thead className="text-left text-[13px]">
                       <tr className="border-b border-border">
                         <th className="px-3 py-2 font-medium">Type</th>
                         <th className="px-3 py-2 font-medium">Host name</th>
@@ -773,7 +773,7 @@ function ServerSetupContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  className={`rounded-lg border p-3 text-left transition-colors ${certificateMode === 'existing' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:bg-muted/40'}`}
+                  className={`rounded-lg border p-3 text-left transition-colors ${certificateMode === 'existing' ? 'border-brand-blue bg-accent ring-1 ring-brand-blue' : 'border-border hover:bg-muted/40'}`}
                   onClick={() => setCertificateMode('existing')}
                   disabled={busy}
                 >
@@ -782,7 +782,7 @@ function ServerSetupContent() {
                 </button>
                 <button
                   type="button"
-                  className={`rounded-lg border p-3 text-left transition-colors ${certificateMode === 'upload' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:bg-muted/40'}`}
+                  className={`rounded-lg border p-3 text-left transition-colors ${certificateMode === 'upload' ? 'border-brand-blue bg-accent ring-1 ring-brand-blue' : 'border-border hover:bg-muted/40'}`}
                   onClick={() => setCertificateMode('upload')}
                   disabled={busy}
                 >
@@ -1428,8 +1428,8 @@ function ServerSetupContent() {
                         )}
                         {sqlUsers && sqlUsers.length > 0 && (
                           <div className="overflow-x-auto rounded-lg border border-border">
-                            <table className="w-full text-sm">
-                              <thead className="bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            <table className="dv-table text-[14px]">
+                              <thead className="text-left text-[13px]">
                                 <tr className="border-b border-border">
                                   <th className="px-3 py-2 font-medium">User</th>
                                   <th className="px-3 py-2 font-medium">Type</th>
@@ -1468,7 +1468,7 @@ function ServerSetupContent() {
 
                     {/* Add the created login as a DeployVare database instance */}
                     {createdLogin && (
-                      <form onSubmit={handleAddInstance} className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <form onSubmit={handleAddInstance} className="space-y-4 rounded-lg border border-brand-blue/30 bg-accent/60 p-4">
                         <div>
                           <p className="font-medium flex items-center gap-2">
                             <PlusCircle className="h-4 w-4 text-primary" />

@@ -229,7 +229,7 @@ export default function ApiDeployPage() {
                       multiple
                       accept=".dll,.exe,.json,.pdb,.config,.xml"
                       disabled={deploying}
-                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-normal file:text-brand-blue hover:file:bg-[#D6E6F4] disabled:opacity-50"
                     />
                     <p className="text-xs text-muted-foreground">
                       Select DLL, EXE, JSON, PDB, and config files
@@ -395,8 +395,8 @@ export default function ApiDeployPage() {
                       Deployed Files ({deploymentResult.deployedFiles.length}):
                     </p>
                     <div className="max-h-96 overflow-auto rounded-lg border border-border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <table className="dv-table text-[14px]">
+                        <thead className="text-left text-[13px]">
                           <tr>
                             <th className="px-3 py-2 text-left">File</th>
                             <th className="px-3 py-2 text-right">Size</th>

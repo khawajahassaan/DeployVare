@@ -151,7 +151,7 @@ export default function ClientsPage() {
               return (
                 <Card
                   key={client.id}
-                  className={isSelected ? 'ring-2 ring-primary' : 'hover:shadow-md transition-shadow'}
+                  className={isSelected ? 'ring-2 ring-brand-blue' : 'hover:shadow-md transition-shadow'}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">

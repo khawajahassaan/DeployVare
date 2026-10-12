@@ -29,9 +29,9 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true">
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in"
+        className="fixed inset-0 bg-black/45 animate-fade-in"
         onClick={() => onOpenChange(false)}
       />
       {children}
@@ -39,6 +39,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   )
 }
 
+// AuditVare modal (CustomModal / r3-modal): white, 16px corners, 20px side padding
 export function DialogContent({
   children,
   className,
@@ -49,7 +50,7 @@ export function DialogContent({
   return (
     <div
       className={cn(
-        "relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl animate-dialog-in",
+        "relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-[580px] overflow-y-auto rounded-[16px] bg-white px-5 pb-5 pt-[15px] shadow-[0_6px_16px_0_rgba(0,0,0,0.08),0_3px_6px_-4px_rgba(0,0,0,0.12),0_9px_28px_8px_rgba(0,0,0,0.05)] animate-dialog-in",
         className
       )}
     >
@@ -76,7 +77,7 @@ export function DialogTitle({
   className?: string
 }) {
   return (
-    <h2 className={cn("text-lg font-semibold tracking-tight", className)}>{children}</h2>
+    <h2 className={cn("text-[18px] font-normal leading-[22px] text-black", className)}>{children}</h2>
   )
 }
 
@@ -88,7 +89,7 @@ export function DialogDescription({
   className?: string
 }) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)}>{children}</p>
+    <p className={cn("text-[14px] text-label", className)}>{children}</p>
   )
 }
 
@@ -100,6 +101,6 @@ export function DialogFooter({
   className?: string
 }) {
   return (
-    <div className={cn("flex justify-end gap-2 mt-6", className)}>{children}</div>
+    <div className={cn("mt-6 flex justify-end gap-2", className)}>{children}</div>
   )
 }

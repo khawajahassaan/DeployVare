@@ -180,7 +180,7 @@ export default function DeployPage() {
                     accept=".zip"
                     onChange={handleFileChange}
                     disabled={deploying}
-                    className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15 disabled:opacity-50"
+                    className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-normal file:text-brand-blue hover:file:bg-[#D6E6F4] disabled:opacity-50"
                   />
                 </div>
 

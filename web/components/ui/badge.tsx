@@ -2,23 +2,24 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
+// AuditVare StatusBadge colours: status text on a 10% tint of the same colour, 4px corners
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors",
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-[4px] px-1.5 py-1 text-[12px] font-normal leading-none transition-colors",
   {
     variants: {
       variant: {
         default:
-          "bg-blue-50 text-blue-700 ring-blue-600/20",
+          "bg-[#0074BA1A] text-[#0F6CBD]",
         secondary:
-          "bg-slate-100 text-slate-700 ring-slate-500/15",
+          "bg-[#3333331A] text-[#333333]",
         destructive:
-          "bg-red-50 text-red-700 ring-red-600/20",
+          "bg-[#C50F1F1A] text-[#C50F1F]",
         outline:
-          "bg-transparent text-slate-700 ring-slate-300",
+          "border border-[#CECECE] bg-transparent text-[#333333]",
         success:
-          "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+          "bg-[#00B0501A] text-[#00873D]",
         warning:
-          "bg-amber-50 text-amber-800 ring-amber-600/25",
+          "bg-[#FFC0001A] text-[#9A6B13]",
       },
     },
     defaultVariants: {

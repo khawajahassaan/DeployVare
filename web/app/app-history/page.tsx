@@ -244,7 +244,7 @@ export default function AppHistoryPage() {
                       <div className="mt-4 space-y-4 border-t border-border pt-4">
                         {deployment.files.length > 0 && (
                           <div>
-                            <h2 className="mb-3 text-base font-semibold text-foreground">Deployed Files</h2>
+                            <h2 className="mb-3 text-[16px] font-normal text-ink">Deployed Files</h2>
                             <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-muted/40 p-3">
                               {deployment.files.map((file) => (
                                 <div key={file.id} className="flex items-center justify-between gap-4 py-1 text-sm">
