@@ -235,7 +235,13 @@ function Write-ApiSettings([string]$ApiPath, [string]$ConnectionString, [string]
     $settings = if (Test-Path -LiteralPath $file) { Get-Content -LiteralPath $file -Raw | ConvertFrom-Json } else { [pscustomobject]@{} }
 
     $settings | Add-Member -NotePropertyName ConnectionStrings -NotePropertyValue ([pscustomobject]@{ DeployVareDb = $ConnectionString }) -Force
-    $settings | Add-Member -NotePropertyName Cors -NotePropertyValue ([pscustomobject]@{ AllowedOrigins = $FrontendOrigin }) -Force
+    # Origins added by hand (e.g. https://<ip>:8443) are kept; the frontend's own origin is added if missing
+    $origins = @()
+    if ($settings.Cors -and $settings.Cors.AllowedOrigins) {
+        $origins = @(([string]$settings.Cors.AllowedOrigins).Split(',') | ForEach-Object { $_.Trim().TrimEnd('/') } | Where-Object { $_ })
+    }
+    if ($origins -notcontains $FrontendOrigin) { $origins += $FrontendOrigin }
+    $settings | Add-Member -NotePropertyName Cors -NotePropertyValue ([pscustomobject]@{ AllowedOrigins = ($origins -join ',') }) -Force
     $settings | Add-Member -NotePropertyName ServerSetup -NotePropertyValue ([pscustomobject]@{ InstallersPath = $InstallersPath }) -Force
 
     # A new installation gets its own JWT secret; an upgrade keeps the existing one (signed-in users stay signed in)
