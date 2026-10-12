@@ -22,6 +22,9 @@ public static class ManualPackageBuilder
     public const string ConfigName = "deploy-config.json";
     public const string ApiKitFolder = "api";
     public const string FrontendKitFolder = "frontend";
+    public const string DatabaseKitFolder = "database";
+    public const string BackupFolder = "backup";
+    public const string DbMigratorFolder = "dbmigrator";
 
     public static void Build(
         string zipPath,
@@ -121,7 +124,7 @@ public static class ManualPackageBuilder
         text.AppendLine($"IIS App Pool:       {config.AppPoolName}");
         text.AppendLine($"IIS Physical Path:  {config.DeploymentPath}");
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
-        text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
+        text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
         text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");
@@ -223,12 +226,15 @@ public static class ManualPackageBuilder
         string apiKitDirectory,
         string frontendKitDirectory,
         string readme,
-        string orchestrator)
+        string orchestrator,
+        string? databaseKitDirectory = null)
     {
         var directory = Path.GetDirectoryName(zipPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
+        if (!string.IsNullOrWhiteSpace(databaseKitDirectory))
+            AddDirectory(archive, databaseKitDirectory!, DatabaseKitFolder);
         AddDirectory(archive, apiKitDirectory, ApiKitFolder);
         AddDirectory(archive, frontendKitDirectory, FrontendKitFolder);
 
@@ -242,8 +248,12 @@ public static class ManualPackageBuilder
     }
 
     public static string BuildCombinedDeployScript() => """
-# DeployVare combined manual deployment. Run as Administrator from this folder: .\Deploy.ps1
-# Deploys the API kit first, then the frontend kit. Each kit is the same as This server only.
+# DeployVare three-tier manual deployment, all tiers on THIS machine. Run as Administrator: .\Deploy.ps1
+# Runs database\Deploy.ps1, then api\Deploy.ps1, then frontend\Deploy.ps1. Each folder is a complete kit:
+# for separate database / API / frontend servers, copy one folder to each server and run its Deploy.ps1.
+# The database settings are asked once here and handed to the database and API kits so they match.
+# -UseDefaults deploys with the values the package was built with, without asking.
+param([switch]$UseDefaults)
 $ErrorActionPreference = 'Stop'
 $PackageRoot = $PSScriptRoot
 
@@ -255,7 +265,14 @@ function Assert-Admin {
     }
 }
 
-function Invoke-Kit([string]$Name) {
+function Read-Setting([string]$Label, [string]$Default) {
+    if ($UseDefaults) { return $Default }
+    $answer = Read-Host "$Label [$Default]"
+    if ([string]::IsNullOrWhiteSpace($answer)) { return $Default }
+    return $answer.Trim()
+}
+
+function Invoke-Kit([string]$Name, [string[]]$KitArgs) {
     $dir = Join-Path $PackageRoot $Name
     $script = Join-Path $dir 'Deploy.ps1'
     if (-not (Test-Path -LiteralPath $script)) {
@@ -264,18 +281,41 @@ function Invoke-Kit([string]$Name) {
     }
     Write-Host ''
     Write-Host "======== $Name ========"
-    $p = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script) -WorkingDirectory $dir -Wait -PassThru -NoNewWindow
-    if ($p.ExitCode -ne 0) {
-        Write-Host "FAILED: the $Name kit exited with code $($p.ExitCode)."
-        exit $p.ExitCode
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script @KitArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAILED: the $Name kit exited with code $LASTEXITCODE."
+        exit $LASTEXITCODE
     }
 }
 
 Assert-Admin
-Invoke-Kit 'api'
-Invoke-Kit 'frontend'
+
+$shared = @()
+if ($UseDefaults) { $shared += '-UseDefaults' }
+
+$dbArgs = @()
+$dbConfigPath = Join-Path $PackageRoot 'database\deploy-config.json'
+$hasDatabaseKit = Test-Path -LiteralPath $dbConfigPath
+if ($hasDatabaseKit) {
+    $db = Get-Content -LiteralPath $dbConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $UseDefaults) { Write-Host 'Database (press Enter to keep the value in brackets):' }
+    $instance = [string]$db.sqlInstanceName
+    if (-not $instance) { $instance = 'SQLEXPRESS' }
+    if ([bool]$db.freshDatabase) {
+        $instance = Read-Setting 'SQL Server instance to install or use' $instance
+        $source = if ($instance -eq 'MSSQLSERVER') { '.' } else { '.\' + $instance }
+    } else {
+        $source = Read-Setting 'SQL Server' ([string]$db.sqlDataSource)
+    }
+    $name = Read-Setting 'Database name' ([string]$db.databaseName)
+    $dbArgs = @('-DatabaseName', $name, '-SqlDataSource', $source, '-SqlInstanceName', $instance)
+    Invoke-Kit 'database' ($shared + $dbArgs)
+}
+
+Invoke-Kit 'api' ($shared + $dbArgs)
+Invoke-Kit 'frontend' $shared
 Write-Host ''
-Write-Host 'Combined deployment completed successfully.'
+Write-Host 'Three-tier deployment completed successfully (database, API and frontend on this machine).'
 exit 0
 """;
 
@@ -284,27 +324,73 @@ exit 0
         string apiServerName,
         string apiBuild,
         string frontendServerName,
-        string frontendBuild)
+        string frontendBuild,
+        bool hasDatabaseKit = false,
+        bool freshDatabase = false,
+        string? databaseName = null)
     {
         var text = new StringBuilder();
-        text.AppendLine("DEPLOYVARE COMBINED MANUAL DEPLOYMENT");
+        text.AppendLine("DEPLOYVARE THREE-TIER MANUAL DEPLOYMENT");
         text.AppendLine();
         text.AppendLine($"Application:        {applicationName}");
+        if (hasDatabaseKit)
+            text.AppendLine($"Database:           {databaseName ?? "(asked on the server)"}  ({(freshDatabase ? "Fresh Database: baseline restore" : "Existing Database")}, then DbMigrator)");
         text.AppendLine($"API server:         {apiServerName}  (build #{apiBuild})");
         text.AppendLine($"Frontend server:    {frontendServerName}  (build #{frontendBuild})");
         text.AppendLine();
-        text.AppendLine("This zip is the API package and the frontend package together.");
-        text.AppendLine("Each folder (api\\ and frontend\\) is the same kit you would get from This server only.");
+        text.AppendLine("Folders (each one is a complete kit with its own Deploy.ps1):");
+        if (hasDatabaseKit)
+            text.AppendLine("  database\\   SQL Server (installed if needed), baseline restore, DbMigrator");
+        text.AppendLine("  api\\        IIS site for the API, .NET Hosting Bundle, Memurai (Redis)");
+        text.AppendLine("  frontend\\   IIS site for the frontend, URL Rewrite");
         text.AppendLine();
-        text.AppendLine("Instructions:");
-        text.AppendLine("  1. Copy the complete folder to the target Windows Server.");
-        text.AppendLine("  2. Open PowerShell as Administrator.");
+        text.AppendLine("All three tiers on ONE server:");
+        text.AppendLine("  1. Copy the complete folder to the server.");
+        text.AppendLine("  2. Open PowerShell as Administrator in that folder.");
         text.AppendLine("  3. Run:");
         text.AppendLine();
         text.AppendLine("       .\\Deploy.ps1");
         text.AppendLine();
-        text.AppendLine("  That deploys the API first, then the frontend.");
-        text.AppendLine("  To deploy only one side, run api\\Deploy.ps1 or frontend\\Deploy.ps1 instead.");
+        text.AppendLine("  It asks for the database settings once, then runs database, API and frontend in that order.");
+        text.AppendLine();
+        text.AppendLine("Separate servers (three-tier):");
+        text.AppendLine("  Copy each folder to its own server and run that folder's Deploy.ps1 as Administrator,");
+        text.AppendLine("  in this order: database\\ first, then api\\, then frontend\\.");
+        text.AppendLine("  With SQL Server on another machine, the API kit cannot grant its IIS app pool account");
+        text.AppendLine("  (a local account) access to the database: put a SQL login in the API's appsettings.json");
+        text.AppendLine("  connection string, or grant the API server's domain machine account.");
+        text.AppendLine();
+        text.AppendLine("Every Deploy.ps1 shows the names it will use (IIS site, app pool, folder, host name,");
+        text.AppendLine("SQL Server, database) and lets you keep each one with Enter or type a new value.");
+        text.AppendLine("Add -UseDefaults to deploy with the packaged values without being asked.");
+        text.AppendLine();
+        return text.ToString();
+    }
+
+    public static string BuildDatabaseReadme(ManualDeployConfig config, string buildNumber, int sqlFileCount)
+    {
+        var text = new StringBuilder();
+        text.AppendLine("DEPLOYVARE DATABASE KIT");
+        text.AppendLine();
+        text.AppendLine($"Build:              #{buildNumber}");
+        text.AppendLine($"SQL Server:         {config.SqlDataSource}");
+        text.AppendLine($"Database:           {config.DatabaseName}");
+        text.AppendLine($"Database Mode:      {(config.FreshDatabase ? "Fresh Database (installs SQL Express if needed, restores the baseline backup)" : "Existing Database (must already exist)")}");
+        text.AppendLine($"SQL scripts:        {sqlFileCount} (run by DbMigrator)");
+        text.AppendLine();
+        text.AppendLine("Instructions:");
+        text.AppendLine("  1. Copy this folder to the database server (or the single server for an all-in-one install).");
+        text.AppendLine("  2. Open PowerShell as Administrator in this folder.");
+        text.AppendLine("  3. Run:");
+        text.AppendLine();
+        text.AppendLine("       .\\Deploy.ps1");
+        text.AppendLine();
+        text.AppendLine("  4. Then deploy the api\\ kit, then the frontend\\ kit.");
+        text.AppendLine();
+        text.AppendLine("Deploy.ps1 installs the .NET runtime DbMigrator needs, installs SQL Server Express when Fresh");
+        text.AppendLine("Database is chosen and none is installed (it prompts for the sa password, never logged),");
+        text.AppendLine("restores the baseline backup unless the database already exists (it is never dropped), and");
+        text.AppendLine("runs DbMigrator with Windows authentication.");
         text.AppendLine();
         return text.ToString();
     }

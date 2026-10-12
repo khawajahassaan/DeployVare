@@ -495,7 +495,7 @@ export default function AppDeployPage() {
     }
     if (packageKind === 'combined') {
       if (!counterpartServerId) {
-        alert('A combined package needs both an API server and a frontend server on this application.');
+        alert('A three-tier package needs both an API server and a frontend server on this application.');
         return;
       }
       if (!counterpartSiteHostName.trim()) {
@@ -1144,8 +1144,8 @@ export default function AppDeployPage() {
                             )}
                           </Button>
                           <p className="mt-2 text-xs text-muted-foreground">
-                            This server only, or a combined API + frontend zip. Copy it to the client server
-                            and run .\Deploy.ps1 as Administrator. Nothing is sent to the server from here.
+                            This server only, or a three-tier zip (database, API and frontend kits). Copy it to the
+                            client server(s) and run .\Deploy.ps1 as Administrator. Nothing is sent to the server from here.
                           </p>
                         </div>
                       )}
@@ -1356,7 +1356,7 @@ export default function AppDeployPage() {
               {downloadingPackage
                 ? 'Preparing your deployment package. Please wait...'
                 : packageKind === 'combined'
-                ? 'One zip with the API kit and the frontend kit. Run Deploy.ps1 once; it deploys the API first, then the frontend. The client server does not need internet.'
+                ? 'One zip with a database, an API and a frontend kit. On one server, run the root Deploy.ps1: it deploys the database, then the API, then the frontend. For separate servers, copy each kit to its own server and run its Deploy.ps1. Every script asks for the IIS and database names (Enter keeps the default). The servers do not need internet.'
                 : `This package will prepare the server, configure IIS, deploy the application${selectedServer?.serverType === 'Api' ? ', configure the database, run DbMigrator' : ''}, and configure HTTPS. The client server does not need internet.`}
             </DialogDescription>
           </DialogHeader>
@@ -1390,11 +1390,11 @@ export default function AppDeployPage() {
                   disabled={downloadingPackage || counterpartServers.length === 0}
                 />
                 <span>
-                  <span className="font-medium">Combined API + frontend</span>
+                  <span className="font-medium">Three-tier: database + API + frontend</span>
                   <span className="block text-xs text-muted-foreground">
                     {counterpartServers.length === 0
-                      ? 'Add the other server on this application to enable a combined zip. This server only still works.'
-                      : 'Both kits in one download. Each folder is the same package as This server only.'}
+                      ? 'Add the other server on this application to enable a three-tier zip. This server only still works.'
+                      : 'Three kits in one download: database\\, api\\ and frontend\\. Run them on separate servers, or all on one server with the root Deploy.ps1.'}
                   </span>
                 </span>
               </label>
@@ -1404,6 +1404,7 @@ export default function AppDeployPage() {
               <p><span className="text-muted-foreground">Client:</span> {clients.find((c) => c.id === selectedClientId)?.name ?? '—'}</p>
               {packageKind === 'combined' && counterpartServer ? (
                 <>
+                  <p><span className="text-muted-foreground">Database:</span> {freshDatabase ? 'Fresh (baseline restore)' : 'Existing'}, then DbMigrator</p>
                   <p><span className="text-muted-foreground">API:</span> {(selectedServer?.serverType === 'Api' ? selectedServer : counterpartServer).serverName}</p>
                   <p><span className="text-muted-foreground">Frontend:</span> {(selectedServer?.serverType === 'Frontend' ? selectedServer : counterpartServer).serverName}</p>
                 </>
@@ -1491,7 +1492,7 @@ export default function AppDeployPage() {
                   />
                   <span>
                     <span className="font-medium">Fresh Database</span>
-                    <span className="block text-xs text-muted-foreground">Install SQL Express if needed and restore the baseline backup. Stops if that database name already exists.</span>
+                    <span className="block text-xs text-muted-foreground">Install SQL Express if needed and restore the baseline backup. A database that already exists is never overwritten: the restore is skipped and DbMigrator updates it (an empty one stops the deploy).</span>
                   </span>
                 </label>
               </div>

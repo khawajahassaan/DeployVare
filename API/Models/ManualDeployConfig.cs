@@ -7,6 +7,8 @@ namespace API.Models;
 public class ManualDeployConfig
 {
     public string ServerName { get; set; } = string.Empty;
+
+    /// <summary>Api, Frontend, or Database (the database kit of a three-tier package).</summary>
     public string ServerType { get; set; } = "Api";
     public string WebsiteName { get; set; } = string.Empty;
     public string AppPoolName { get; set; } = string.Empty;
@@ -17,6 +19,15 @@ public class ManualDeployConfig
     public bool PreserveWebConfig { get; set; } = true;
     public List<string> KeepOnServerPaths { get; set; } = new();
     public bool FreshDatabase { get; set; }
+
+    /// <summary>
+    /// API kit of a three-tier package: the database kit installs SQL Server, restores and migrates, so this
+    /// kit only grants its app pool access when SQL Server is on the same machine.
+    /// </summary>
+    public bool SeparateDatabase { get; set; }
+
+    /// <summary>Database kit: folder holding DbMigrator.exe and its dependencies.</summary>
+    public string? DbMigratorFolder { get; set; }
     public string SqlInstanceName { get; set; } = "SQLEXPRESS";
     public string SqlDataSource { get; set; } = @".\SQLEXPRESS";
     public string? DatabaseName { get; set; }

@@ -194,6 +194,63 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
+    public void ThreeTierPackage_AddsTheDatabaseKitAndRunsItFirst()
+    {
+        var database = NewDirectory("database-kit", "Deploy.ps1", "deploy-config.json",
+            Path.Combine("dbmigrator", "DbMigrator.exe"), Path.Combine("sqlscripts", "SQLPatch_New", "1.sql"),
+            Path.Combine("backup", "AuditVareSchema.bak"));
+        var api = NewDirectory("api-kit", "Deploy.ps1", "deploy-config.json", Path.Combine("app", "API.dll"));
+        var frontend = NewDirectory("frontend-kit", "Deploy.ps1", Path.Combine("app", "index.html"));
+        var zipPath = Path.Combine(_root, "three-tier.zip");
+
+        ManualPackageBuilder.BuildCombined(
+            zipPath, api, frontend, "readme", ManualPackageBuilder.BuildCombinedDeployScript(), database);
+
+        using var archive = ZipFile.OpenRead(zipPath);
+        var names = archive.Entries.Select(e => e.FullName).ToList();
+        Assert.Contains("database/Deploy.ps1", names);
+        Assert.Contains("database/dbmigrator/DbMigrator.exe", names);
+        Assert.Contains("database/sqlscripts/SQLPatch_New/1.sql", names);
+        Assert.Contains("database/backup/AuditVareSchema.bak", names);
+        Assert.Contains("api/app/API.dll", names);
+        Assert.Contains("frontend/app/index.html", names);
+
+        // database, then API, then frontend - and the database settings asked once go to both
+        var root = new StreamReader(archive.Entries.Single(e => e.FullName == "Deploy.ps1").Open()).ReadToEnd();
+        var databaseAt = root.IndexOf("Invoke-Kit 'database'", StringComparison.Ordinal);
+        var apiAt = root.IndexOf("Invoke-Kit 'api'", StringComparison.Ordinal);
+        var frontendAt = root.IndexOf("Invoke-Kit 'frontend'", StringComparison.Ordinal);
+        Assert.True(databaseAt >= 0 && databaseAt < apiAt && apiAt < frontendAt, "kits must run database, api, frontend");
+        Assert.Contains("'-DatabaseName'", root);
+        Assert.Contains("UseDefaults", root);
+    }
+
+    [Fact]
+    public void ThreeTierReadme_ExplainsOneServerAndSeparateServers()
+    {
+        var readme = ManualPackageBuilder.BuildCombinedReadme(
+            "AuditVare", "Dev API", "1.0.0456", "Dev Web", "20261011.2",
+            hasDatabaseKit: true, freshDatabase: true, databaseName: "AuditVareBOP");
+
+        Assert.Contains("database\\", readme);
+        Assert.Contains("AuditVareBOP", readme);
+        Assert.Contains("database\\ first, then api\\, then frontend\\", readme);
+        Assert.Contains("-UseDefaults", readme);
+    }
+
+    [Fact]
+    public void DeployScript_HandlesTheDatabaseKitAndAsksForNames()
+    {
+        var script = ManualPackageBuilder.LoadDeployScript();
+        Assert.Contains("[switch]$UseDefaults", script);
+        Assert.Contains("[string]$DatabaseName", script);
+        Assert.Contains("function Confirm-Settings", script);
+        Assert.Contains("serverType -eq 'Database'", script);
+        Assert.Contains("function Test-RunsDatabase", script);
+        Assert.Contains("separateDatabase", script);
+    }
+
+    [Fact]
     public void CombinedFileName_IncludesBothBuilds()
     {
         Assert.Equal(

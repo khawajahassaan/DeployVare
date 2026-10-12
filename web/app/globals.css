@@ -157,7 +157,7 @@ body {
 .dv-dark-field:-webkit-autofill:hover,
 .dv-dark-field:-webkit-autofill:focus {
   -webkit-text-fill-color: rgba(255, 255, 255, 0.85);
-  -webkit-box-shadow: 0 0 0 1000px #232327 inset;
+  -webkit-box-shadow: 0 0 0 1000px #0E0E10 inset;
   caret-color: #ffffff;
   transition: background-color 9999s ease-out;
 }

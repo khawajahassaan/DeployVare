@@ -64,7 +64,7 @@ public class ManualPackageService : IManualPackageService
         if (request.Combined)
             return await BuildCombinedAsync(request, cancellationToken);
 
-        return await BuildSingleAsync(request, certificatePath: null, cancellationToken);
+        return await BuildSingleAsync(request, certificatePath: null, separateDatabase: false, cancellationToken);
     }
 
     private async Task<ManualPackageResult> BuildCombinedAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken)
@@ -105,8 +105,9 @@ public class ManualPackageService : IManualPackageService
             var apiRequest = ForInnerServer(request, apiServer.Id, apiBuildId, apiArtifact, apiHost, isApi: true);
             var frontendRequest = ForInnerServer(request, frontendServer.Id, frontendBuildId, frontendArtifact, frontendHost, isApi: false);
 
-            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, cancellationToken);
-            frontendPackage = await BuildSingleAsync(frontendRequest, certificateTemp, cancellationToken);
+            // Three tiers: the API kit leaves SQL Server, the restore and DbMigrator to the database kit
+            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, separateDatabase: true, cancellationToken);
+            frontendPackage = await BuildSingleAsync(frontendRequest, certificateTemp, separateDatabase: false, cancellationToken);
 
             var apiDir = Path.Combine(workspace, ManualPackageBuilder.ApiKitFolder);
             var frontendDir = Path.Combine(workspace, ManualPackageBuilder.FrontendKitFolder);
@@ -116,6 +117,9 @@ public class ManualPackageService : IManualPackageService
             var applicationName = selected.Application?.Name ?? selected.ServerName;
             var apiBuildNumber = ExtractBuildNumber(apiPackage.FileName);
             var frontendBuildNumber = ExtractBuildNumber(frontendPackage.FileName);
+
+            var databaseDir = Path.Combine(workspace, ManualPackageBuilder.DatabaseKitFolder);
+            var databaseConfig = BuildDatabaseKit(apiDir, databaseDir, apiServer, request, apiBuildNumber, apiPackage.SqlFileCount);
             var fileName = ManualPackageBuilder.BuildCombinedFileName(applicationName, apiBuildNumber, frontendBuildNumber);
             var zipPath = Path.Combine(workspace, fileName);
 
@@ -128,8 +132,12 @@ public class ManualPackageService : IManualPackageService
                     apiServer.ServerName,
                     apiBuildNumber,
                     frontendServer.ServerName,
-                    frontendBuildNumber),
-                ManualPackageBuilder.BuildCombinedDeployScript()), cancellationToken);
+                    frontendBuildNumber,
+                    hasDatabaseKit: true,
+                    freshDatabase: databaseConfig.FreshDatabase,
+                    databaseName: databaseConfig.DatabaseName),
+                ManualPackageBuilder.BuildCombinedDeployScript(),
+                databaseDir), cancellationToken);
 
             RemoveIntermediateFiles(workspace, zipPath);
 
@@ -216,6 +224,7 @@ public class ManualPackageService : IManualPackageService
     private async Task<ManualPackageResult> BuildSingleAsync(
         DownloadArtifactPackageRequest request,
         string? certificatePath,
+        bool separateDatabase,
         CancellationToken cancellationToken)
     {
         var context = await _azureDevOpsConfigService.ResolveDeploymentContextAsync(
@@ -242,8 +251,10 @@ public class ManualPackageService : IManualPackageService
             extraFiles.Add(($"{ManualPackageBuilder.CertificateFolder}/site.pfx", certificateTemp));
         }
 
-        CollectInstallers(isFrontend, request.FreshDatabase && !isFrontend, extraFiles);
-        if (request.FreshDatabase && !isFrontend)
+        // With a separate database kit, SQL Express and the baseline backup travel in that kit instead
+        var packsDatabase = request.FreshDatabase && !isFrontend && !separateDatabase;
+        CollectInstallers(isFrontend, packsDatabase, extraFiles);
+        if (packsDatabase)
             CollectBaselineBackup(extraFiles);
 
         var build = await _azureDevOpsService.GetEligibleBuildAsync(context.Credentials, request.BuildId,
@@ -324,7 +335,8 @@ public class ManualPackageService : IManualPackageService
                 RequireSni = true,
                 PreserveWebConfig = source.PreserveWebConfig,
                 KeepOnServerPaths = keepPaths,
-                FreshDatabase = request.FreshDatabase && !isFrontend,
+                FreshDatabase = request.FreshDatabase && !isFrontend && !separateDatabase,
+                SeparateDatabase = separateDatabase && !isFrontend,
                 SqlInstanceName = sqlInstance,
                 SqlDataSource = sqlDataSource ?? $@".\{sqlInstance}",
                 DatabaseName = databaseName,
@@ -470,6 +482,93 @@ public class ManualPackageService : IManualPackageService
 
     private void CollectBaselineBackup(List<(string, string)> extraFiles)
     {
+        var backup = FindBaselineBackup();
+        extraFiles.Add(($"{ManualPackageBuilder.DatabaseFolder}/{Path.GetFileName(backup)}", backup));
+    }
+
+    /// <summary>
+    /// Database kit of a three-tier package, assembled next to the extracted API kit: the build's SQL scripts
+    /// (moved out of the API kit), DbMigrator, the .NET runtime installer DbMigrator needs, SQL Express and
+    /// the baseline backup for Fresh Database, Deploy.ps1 and its config.
+    /// </summary>
+    private ManualDeployConfig BuildDatabaseKit(
+        string apiKitDirectory,
+        string databaseKitDirectory,
+        ApplicationServer apiServer,
+        DownloadArtifactPackageRequest request,
+        string buildNumber,
+        int sqlFileCount)
+    {
+        Directory.CreateDirectory(databaseKitDirectory);
+        var apiConfigPath = Path.Combine(apiKitDirectory, ManualPackageBuilder.ConfigName);
+        var apiConfig = JsonSerializer.Deserialize<ManualDeployConfig>(File.ReadAllText(apiConfigPath), ConfigJson)
+            ?? throw new InvalidOperationException("The API kit has no deploy-config.json.");
+
+        var scriptsSource = Path.Combine(apiKitDirectory, ManualPackageBuilder.ScriptsFolder);
+        var hasScripts = Directory.Exists(scriptsSource);
+        if (hasScripts)
+        {
+            Directory.Move(scriptsSource, Path.Combine(databaseKitDirectory, ManualPackageBuilder.ScriptsFolder));
+
+            var migrator = DbMigratorKit.Copy(
+                Path.Combine(apiKitDirectory, ManualPackageBuilder.AppFolder),
+                Path.Combine(databaseKitDirectory, ManualPackageBuilder.DbMigratorFolder));
+            if (!migrator.Found)
+                throw new InvalidOperationException(
+                    "DbMigrator.exe was not found in the API build, so the database kit cannot run the SQL scripts.");
+            _logger.LogInformation("DatabaseKit DbMigrator copied: {Files} file(s), trimmed {Trimmed}", migrator.FileCount, migrator.Trimmed);
+        }
+
+        // The API kit no longer carries the scripts
+        apiConfig.HasScripts = false;
+        File.WriteAllText(apiConfigPath, JsonSerializer.Serialize(apiConfig, ConfigJson), new UTF8Encoding(false));
+
+        var installers = new List<(string EntryName, string SourcePath)>();
+        if (hasScripts)
+            AddInstaller(ServerComponent.HostingBundle, installers, required: true,
+                "Add the .NET 10 Hosting Bundle (dotnet-hosting-*-win.exe) to the Installers folder; DbMigrator needs the .NET runtime.");
+        if (request.FreshDatabase)
+        {
+            AddInstaller(ServerComponent.SqlServer, installers, required: true,
+                "Fresh Database needs SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the Installers folder.");
+            var backup = FindBaselineBackup();
+            installers.Add(($"{ManualPackageBuilder.BackupFolder}/{Path.GetFileName(backup)}", backup));
+        }
+        foreach (var (entryName, sourcePath) in installers)
+        {
+            var target = Path.Combine(databaseKitDirectory, entryName.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(sourcePath, target, overwrite: true);
+        }
+
+        var sqlInstance = string.IsNullOrWhiteSpace(apiConfig.SqlInstanceName) ? "SQLEXPRESS" : apiConfig.SqlInstanceName;
+        var config = new ManualDeployConfig
+        {
+            ServerName = $"{apiServer.ServerName} database",
+            ServerType = "Database",
+            FreshDatabase = request.FreshDatabase,
+            SqlInstanceName = sqlInstance,
+            SqlDataSource = string.IsNullOrWhiteSpace(apiConfig.SqlDataSource) ? $@".\{sqlInstance}" : apiConfig.SqlDataSource,
+            DatabaseName = string.IsNullOrWhiteSpace(apiConfig.DatabaseName) ? "AuditVare" : apiConfig.DatabaseName,
+            HasScripts = hasScripts,
+            DbMigratorFolder = hasScripts ? ManualPackageBuilder.DbMigratorFolder : null,
+            RequiredDotNetMajor = _setupOptions.RequiredDotNetMajorVersion,
+            MinimumSdkMajor = _setupOptions.MinimumSdkMajorVersion,
+            RequiredRedisMajor = _setupOptions.RequiredRedisMajorVersion
+        };
+
+        File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.ConfigName),
+            JsonSerializer.Serialize(config, ConfigJson), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.DeployScriptName),
+            ManualPackageBuilder.LoadDeployScript(), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.ReadmeName),
+            ManualPackageBuilder.BuildDatabaseReadme(config, buildNumber, sqlFileCount), new UTF8Encoding(false));
+
+        return config;
+    }
+
+    private string FindBaselineBackup()
+    {
         var directory = _installerCatalog.GetInstallers().FirstOrDefault()?.Directory;
         if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             throw new InvalidOperationException("The Installers folder was not found, so the baseline database backup cannot be packaged.");
@@ -478,10 +577,7 @@ public class ManualPackageService : IManualPackageService
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
         if (bak != null)
-        {
-            extraFiles.Add(($"{ManualPackageBuilder.DatabaseFolder}/{Path.GetFileName(bak)}", bak));
-            return;
-        }
+            return bak;
 
         var zip = Directory.GetFiles(directory, "AuditVareBackup*.zip")
             .Concat(Directory.GetFiles(directory, "*.zip").Where(f => Path.GetFileName(f).Contains("Backup", StringComparison.OrdinalIgnoreCase)))
@@ -492,7 +588,7 @@ public class ManualPackageService : IManualPackageService
             throw new InvalidOperationException(
                 "Fresh Database needs a baseline .bak (or AuditVareBackup*.zip) in the Installers folder.");
 
-        extraFiles.Add(($"{ManualPackageBuilder.DatabaseFolder}/{Path.GetFileName(zip)}", zip));
+        return zip;
     }
 
     private static async Task<string> SaveCertificateAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken)

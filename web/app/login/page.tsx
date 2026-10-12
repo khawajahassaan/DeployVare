@@ -63,7 +63,7 @@ export default function LoginPage() {
   // Same split layout as the AuditVare / TransVare sign-in: animated brand panel on the
   // left (a banner on small screens), the form on a black page to the right
   return (
-    <div className="relative flex min-h-screen flex-col bg-[#1A1A1D] md:grid md:h-screen md:grid-cols-[minmax(0,55%)_minmax(0,1fr)] md:px-3">
+    <div className="relative flex min-h-screen flex-col bg-[#000000] md:grid md:h-screen md:grid-cols-[minmax(0,55%)_minmax(0,1fr)] md:px-3">
       <div className="relative h-[220px] shrink-0 overflow-hidden sm:h-[260px] md:mt-2.5 md:h-[97vh] md:rounded-[16px]">
         <AuroraBackdrop variant="dark" />
 
@@ -83,7 +83,7 @@ export default function LoginPage() {
           </div>
 
           {/* Arrow pill — desktop only */}
-          <div className="hidden bg-[#1A1A1D] p-1.5 md:block md:w-[173px] md:rounded-l-full">
+          <div className="hidden bg-[#000000] p-1.5 md:block md:w-[173px] md:rounded-l-full">
             <div className="flex size-[85px] items-center justify-center rounded-full bg-white/90 p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/auth-arrow.png" alt="" className="w-[56px]" />
@@ -117,7 +117,7 @@ export default function LoginPage() {
                   onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
                   required
                   disabled={isLoading}
-                  className="dv-dark-field border-[#424242] bg-[#232327] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#232327] disabled:text-white/85"
+                  className="dv-dark-field border-[#424242] bg-[#0E0E10] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#0E0E10] disabled:text-white/85"
                 />
               </div>
 
@@ -134,7 +134,7 @@ export default function LoginPage() {
                     onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                     required
                     disabled={isLoading}
-                    className="pr-10 dv-dark-field border-[#424242] bg-[#232327] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#232327] disabled:text-white/85"
+                    className="pr-10 dv-dark-field border-[#424242] bg-[#0E0E10] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#0E0E10] disabled:text-white/85"
                   />
                   <button
                     type="button"
@@ -156,7 +156,7 @@ export default function LoginPage() {
 
             {/* Database settings collapsible — only shown inside Tauri */}
             {config !== null && (
-              <div className="mt-5 overflow-hidden rounded-[10px] border border-[#3A3A3F]">
+              <div className="mt-5 overflow-hidden rounded-[10px] border border-[#222226]">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between px-4 py-3 text-[14px] text-white/85 transition-colors hover:bg-white/5"
@@ -167,7 +167,7 @@ export default function LoginPage() {
                 </button>
 
                 {dbOpen && (
-                  <div className="space-y-3 border-t border-[#3A3A3F] px-4 pb-4 pt-3">
+                  <div className="space-y-3 border-t border-[#222226] px-4 pb-4 pt-3">
                     {/* Mode switch — AuditVare segmented control */}
                     <div className="flex gap-0.5 rounded-[8px] bg-white/10 p-[2px]">
                       {['local', 'sqlserver'].map((mode) => (
@@ -196,7 +196,7 @@ export default function LoginPage() {
                           placeholder="Server=...;Database=...;User Id=...;Password=..."
                           value={config.connectionString}
                           onChange={(e) => setConfig({ ...config, connectionString: e.target.value })}
-                          className="dv-dark-field border-[#424242] bg-[#232327] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#232327] disabled:text-white/85"
+                          className="dv-dark-field border-[#424242] bg-[#0E0E10] text-white/85 placeholder:text-white/30 hover:border-[#8C8C8C] focus-visible:border-[#8C8C8C] disabled:border-[#424242] disabled:bg-[#0E0E10] disabled:text-white/85"
                         />
                       </div>
                     )}

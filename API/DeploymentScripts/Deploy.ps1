@@ -1,5 +1,15 @@
 # DeployVare offline manual deployment. Run as Administrator from this folder: .\Deploy.ps1
 # Reads deploy-config.json. Does not call DeployVare or Azure DevOps. Does not print secrets.
+# Serves every kit: API, Frontend, and the Database kit of a three-tier package (serverType in the config).
+# Shows the names it will use (IIS site, app pool, folder, host name, SQL Server, database) and lets you keep
+# each with Enter or type a new one. -UseDefaults takes the packaged values without asking. The three-tier
+# root Deploy.ps1 passes -DatabaseName / -SqlDataSource / -SqlInstanceName so the database and API kits match.
+param(
+    [switch]$UseDefaults,
+    [string]$DatabaseName,
+    [string]$SqlDataSource,
+    [string]$SqlInstanceName
+)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -36,15 +46,82 @@ function Assert-Admin {
 function Read-Config {
     if (-not (Test-Path -LiteralPath $ConfigPath)) { Fail 'deploy-config.json was not found next to Deploy.ps1.' }
     $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
-    $cfg = $raw | ConvertFrom-Json
-    if (-not $cfg.websiteName -or -not $cfg.appPoolName -or -not $cfg.deploymentPath -or -not $cfg.siteHostName) {
-        Fail 'deploy-config.json is missing websiteName, appPoolName, deploymentPath or siteHostName.'
+    return $raw | ConvertFrom-Json
+}
+
+function Set-Cfg([object]$Cfg, [string]$Name, $Value) {
+    $Cfg | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+}
+
+# True when this kit installs SQL Server, restores and runs DbMigrator: the database kit, or an API kit
+# that carries its own database (every package except the API kit of a three-tier package)
+function Test-RunsDatabase([object]$Cfg) {
+    if ($Cfg.serverType -eq 'Database') { return $true }
+    return ($Cfg.serverType -eq 'Api') -and -not [bool]$Cfg.separateDatabase
+}
+
+function Test-LocalSqlServer([string]$DataSource) {
+    $s = ([string]$DataSource).Trim()
+    if ($s -match '^(tcp|np|lpc):') { $s = $s.Substring($s.IndexOf(':') + 1) }
+    $hostPart = (($s -split '[\\,]')[0]).Trim()
+    return @('', '.', '(local)', 'localhost', '127.0.0.1', '::1', $env:COMPUTERNAME) -contains $hostPart
+}
+
+function Read-Setting([string]$Label, [string]$Default, [scriptblock]$Validate, [string]$Hint) {
+    $ask = (-not $UseDefaults) -and [Environment]::UserInteractive
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        $value = $Default
+        if ($ask) {
+            $answer = Read-Host "  $Label [$Default]"
+            if (-not [string]::IsNullOrWhiteSpace($answer)) { $value = $answer.Trim() }
+        }
+        if (-not $Validate -or (& $Validate $value)) { return $value }
+        if (-not $ask) { Fail "$Label '$value' is not valid. $Hint" }
+        Write-Host "  '$value' is not valid. $Hint"
     }
-    if ($cfg.deploymentPath -notmatch '^[A-Za-z]:\\') {
-        Fail "Deployment path '$($cfg.deploymentPath)' is not a rooted Windows path."
+    Fail "$Label was not valid after several attempts."
+}
+
+function Confirm-Settings([object]$Cfg) {
+    # Values handed down by the three-tier root script win and are not asked again
+    if ($DatabaseName) { Set-Cfg $Cfg 'databaseName' $DatabaseName }
+    if ($SqlDataSource) { Set-Cfg $Cfg 'sqlDataSource' $SqlDataSource }
+    if ($SqlInstanceName) { Set-Cfg $Cfg 'sqlInstanceName' $SqlInstanceName }
+
+    if ((-not $UseDefaults) -and [Environment]::UserInteractive) {
+        Write-Host ''
+        Write-Host "Settings for $($Cfg.serverName) (press Enter to keep the value in brackets):"
     }
-    if ($cfg.deploymentPath -match '\.\.') { Fail 'Deployment path must not contain ..' }
-    return $cfg
+
+    $iisName = { param($v) $v -and ($v -notmatch '[\\/:*?"<>|]') }
+    if ($Cfg.serverType -ne 'Database') {
+        Set-Cfg $Cfg 'websiteName' (Read-Setting 'IIS site name' ([string]$Cfg.websiteName) $iisName 'Use letters, digits, spaces, dots or dashes.')
+        Set-Cfg $Cfg 'appPoolName' (Read-Setting 'IIS application pool' ([string]$Cfg.appPoolName) $iisName 'Use letters, digits, spaces, dots or dashes.')
+        Set-Cfg $Cfg 'deploymentPath' (Read-Setting 'Site folder' ([string]$Cfg.deploymentPath) {
+            param($v) $v -and ($v -match '^[A-Za-z]:\\') -and ($v -notmatch '\.\.')
+        } 'Enter a full Windows path such as C:\inetpub\AuditVare-API, without ..')
+        Set-Cfg $Cfg 'siteHostName' (Read-Setting 'Site host name' ([string]$Cfg.siteHostName) {
+            param($v) $v -and ($v -match '^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$')
+        } 'Enter a host name such as api.client.com (no http:// or path).')
+    }
+
+    $usesDatabase = ($Cfg.serverType -eq 'Database') -or (($Cfg.serverType -eq 'Api') -and $Cfg.databaseName)
+    if ($usesDatabase -and -not $DatabaseName) {
+        if ((Test-RunsDatabase $Cfg) -and [bool]$Cfg.freshDatabase -and -not $SqlDataSource) {
+            $instance = [string]$Cfg.sqlInstanceName
+            if (-not $instance) { $instance = 'SQLEXPRESS' }
+            $instance = Read-Setting 'SQL Server instance to install or use' $instance {
+                param($v) $v -and ($v -match '^[A-Za-z_][A-Za-z0-9_$]{0,15}$')
+            } 'Instance names are up to 16 letters, digits or underscores (MSSQLSERVER for the default instance).'
+            Set-Cfg $Cfg 'sqlInstanceName' $instance
+            Set-Cfg $Cfg 'sqlDataSource' $(if ($instance -eq 'MSSQLSERVER') { '.' } else { '.\' + $instance })
+        } elseif (-not $SqlDataSource) {
+            Set-Cfg $Cfg 'sqlDataSource' (Read-Setting 'SQL Server' ([string]$Cfg.sqlDataSource) { param($v) [bool]$v } 'Enter the SQL Server, e.g. . or .\SQLEXPRESS or dbserver,1433.')
+        }
+        Set-Cfg $Cfg 'databaseName' (Read-Setting 'Database name' ([string]$Cfg.databaseName) {
+            param($v) $v -and ($v.Length -le 128) -and ($v -notmatch '[\[\];''"]')
+        } 'Use letters, digits, underscores or dashes.')
+    }
 }
 
 function Installer-Path([string]$Pattern) {
@@ -102,6 +179,27 @@ function Ensure-Iis {
     if (-not $w3svc) { Fail 'IIS installation finished but W3SVC was not found.' }
     if ($w3svc.Status -ne 'Running') { Start-Service W3SVC }
     Write-Step '[OK] IIS installed'
+}
+
+function Ensure-DotNetRuntime([object]$Cfg) {
+    # Database kit: DbMigrator is a framework-dependent .NET app, so only the runtime is needed (no IIS module, no SDK).
+    # The Hosting Bundle installs the runtime and works without IIS.
+    if (-not [bool]$Cfg.hasScripts) { return }
+    $major = [int]$Cfg.requiredDotNetMajor
+    $dotnet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+    $runtimes = @()
+    if (Test-Path $dotnet) {
+        $runtimes = @(& $dotnet --list-runtimes 2>$null | Where-Object { $_ -like 'Microsoft.NETCore.App *' } | ForEach-Object { ($_ -split ' ')[1] })
+    }
+    if ($runtimes | Where-Object { ($_ -split '\.')[0] -eq "$major" }) {
+        Write-Step "[OK] .NET $major runtime (for DbMigrator)"
+        return
+    }
+    $file = Installer-Path 'dotnet-hosting-*-win.exe'
+    if (-not $file) { Fail ".NET $major runtime is missing and no Hosting Bundle installer is in the package installers folder." }
+    Write-Step "Installing .NET $major runtime via the Hosting Bundle ($([IO.Path]::GetFileName($file)))..."
+    Invoke-KnownInstaller $file 30
+    Write-Step "[OK] .NET $major runtime installed"
 }
 
 function Ensure-DotNet([object]$Cfg) {
@@ -352,7 +450,7 @@ function New-DvSqlConnection([string]$DataSource, [string]$Catalog) {
 }
 
 function Ensure-SqlServer([object]$Cfg) {
-    if ($Cfg.serverType -ne 'Api' -or -not [bool]$Cfg.freshDatabase) { return }
+    if (-not (Test-RunsDatabase $Cfg) -or -not [bool]$Cfg.freshDatabase) { return }
     $instance = [string]$Cfg.sqlInstanceName
     if (-not $instance) { $instance = 'SQLEXPRESS' }
     $installed = $null -ne (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL' -ErrorAction SilentlyContinue)
@@ -409,7 +507,9 @@ function Ensure-SqlServer([object]$Cfg) {
 }
 
 function Get-BaselineBak {
-    $dir = Join-Path $PackageRoot 'database'
+    # API kit: database\  -  database kit of a three-tier package: backup\
+    $dir = Join-Path $PackageRoot 'backup'
+    if (-not (Test-Path -LiteralPath $dir)) { $dir = Join-Path $PackageRoot 'database' }
     if (-not (Test-Path -LiteralPath $dir)) { return $null }
     $bak = Get-ChildItem -LiteralPath $dir -Filter '*.bak' -File -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($bak) { return $bak.FullName }
@@ -424,14 +524,14 @@ function Get-BaselineBak {
 }
 
 function Restore-Database([object]$Cfg) {
-    if ($Cfg.serverType -ne 'Api' -or -not [bool]$Cfg.freshDatabase) { return }
+    if (-not (Test-RunsDatabase $Cfg) -or -not [bool]$Cfg.freshDatabase) { return }
     $database = [string]$Cfg.databaseName
     $dataSource = [string]$Cfg.sqlDataSource
     if (-not $database) { Fail 'Fresh Database was selected but databaseName is missing from deploy-config.json.' }
     if (-not $dataSource) { $dataSource = '.\' + $Cfg.sqlInstanceName }
 
     $bak = Get-BaselineBak
-    if (-not $bak) { Fail 'Fresh Database was selected but the package has no .bak / backup zip under database\.' }
+    if (-not $bak) { Fail 'Fresh Database was selected but the package has no .bak / backup zip under backup\ or database\.' }
 
     Write-Step "Connecting to SQL Server $dataSource..."
     $master = $null
@@ -498,8 +598,53 @@ function Restore-Database([object]$Cfg) {
     }
 }
 
+function Assert-DatabaseExists([object]$Cfg) {
+    Write-Step "Existing Database: will not restore. Validating '$($Cfg.databaseName)' on $($Cfg.sqlDataSource)..."
+    $check = New-DvSqlConnection ([string]$Cfg.sqlDataSource) 'master'
+    try {
+        $cmd = $check.CreateCommand()
+        $cmd.CommandText = 'SELECT CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END'
+        $null = $cmd.Parameters.AddWithValue('@database', [string]$Cfg.databaseName)
+        if ([int]$cmd.ExecuteScalar() -ne 1) { Fail "Database '$($Cfg.databaseName)' does not exist. Choose Fresh Database or create it first." }
+        Write-Step "[OK] Database '$($Cfg.databaseName)' exists"
+    } finally { $check.Close() }
+}
+
+# Same safety rule as DeployVare's remote deploy: DbMigrator only upgrades a database that already has the
+# AuditVare schema (its SchemaVersions journal). On an empty database it would replay every patch and fail,
+# and a database without the journal is not one DbMigrator manages.
+function Assert-MigratableDatabase([object]$Cfg) {
+    if (-not (Test-RunsDatabase $Cfg) -or -not [bool]$Cfg.hasScripts -or -not $Cfg.databaseName) { return }
+    $database = [string]$Cfg.databaseName
+    $db = New-DvSqlConnection ([string]$Cfg.sqlDataSource) $database
+    try {
+        $cmd = $db.CreateCommand()
+        $cmd.CommandText = "SELECT (SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped = 0), CASE WHEN OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NULL THEN 0 ELSE 1 END"
+        $reader = $cmd.ExecuteReader()
+        $null = $reader.Read()
+        $tables = [int]$reader.GetValue(0)
+        $journal = [int]$reader.GetValue(1)
+        $reader.Close()
+    } finally { $db.Close() }
+
+    if ($tables -eq 0) {
+        Fail ("Database '$database' exists but is empty, so DbMigrator cannot upgrade it. Delete the empty database " +
+              "(SSMS: right-click it > Delete) and run again with Fresh Database to restore the baseline, or choose another name.")
+    }
+    if ($journal -eq 0) {
+        Fail "Database '$database' has tables but no dbo.SchemaVersions, so it is not a database DbMigrator manages. Nothing was changed."
+    }
+    Write-Step "[OK] '$database' has the AuditVare schema ($tables tables); DbMigrator will update it"
+}
+
 function Grant-AppPoolAccess([object]$Cfg) {
     if ($Cfg.serverType -ne 'Api' -or -not $Cfg.databaseName) { return }
+    if ([bool]$Cfg.separateDatabase -and -not (Test-LocalSqlServer ([string]$Cfg.sqlDataSource))) {
+        # IIS APPPOOL\<pool> is a local virtual account: another machine's SQL Server cannot resolve it
+        Write-Step "Database is on $($Cfg.sqlDataSource), not on this server: skipping the app pool login."
+        Write-Step "  Use a SQL login in appsettings.json, or grant this server's domain machine account on '$($Cfg.databaseName)'."
+        return
+    }
     Import-Module WebAdministration
     $poolName = [string]$Cfg.appPoolName
     $login = 'IIS APPPOOL\' + $poolName
@@ -514,7 +659,11 @@ function Grant-AppPoolAccess([object]$Cfg) {
     $database = [string]$Cfg.databaseName
     $dataSource = [string]$Cfg.sqlDataSource
     Write-Step "Granting $login db_owner on '$database'..."
-    $db = New-DvSqlConnection $dataSource $database
+    try {
+        $db = New-DvSqlConnection $dataSource $database
+    } catch {
+        Fail "Could not open database '$database' on $dataSource to grant the app pool access ($($_.Exception.Message)). In a three-tier package, run the database kit first."
+    }
     try {
         $cmd = $db.CreateCommand()
         $cmd.CommandText = @'
@@ -617,13 +766,23 @@ function Publish-App([object]$Cfg) {
 }
 
 function Invoke-DbMigrator([object]$Cfg) {
-    if ($Cfg.serverType -ne 'Api' -or -not [bool]$Cfg.hasScripts -or -not $Cfg.databaseName) { return }
-    $deploymentPath = [string]$Cfg.deploymentPath
-    $exe = Get-ChildItem -LiteralPath $deploymentPath -Filter 'DbMigrator.exe' -Recurse -File -ErrorAction SilentlyContinue |
-        Select-Object -First 1 -ExpandProperty FullName
-    if (-not $exe) { Fail 'DbMigrator.exe was not found in the deployment path.' }
-    $scripts = Join-Path $deploymentPath 'sqlscripts'
-    if (-not (Test-Path -LiteralPath $scripts)) { $scripts = Join-Path $PackageRoot 'sqlscripts' }
+    if (-not (Test-RunsDatabase $Cfg) -or -not [bool]$Cfg.hasScripts -or -not $Cfg.databaseName) { return }
+    if ($Cfg.serverType -eq 'Database') {
+        # Database kit: DbMigrator and the scripts travel in the kit itself
+        $folder = [string]$Cfg.dbMigratorFolder
+        if (-not $folder) { $folder = 'dbmigrator' }
+        $exe = Get-ChildItem -LiteralPath (Join-Path $PackageRoot $folder) -Filter 'DbMigrator.exe' -Recurse -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+        if (-not $exe) { Fail "DbMigrator.exe was not found in the kit's $folder\ folder." }
+        $scripts = Join-Path $PackageRoot 'sqlscripts'
+    } else {
+        $deploymentPath = [string]$Cfg.deploymentPath
+        $exe = Get-ChildItem -LiteralPath $deploymentPath -Filter 'DbMigrator.exe' -Recurse -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+        if (-not $exe) { Fail 'DbMigrator.exe was not found in the deployment path.' }
+        $scripts = Join-Path $deploymentPath 'sqlscripts'
+        if (-not (Test-Path -LiteralPath $scripts)) { $scripts = Join-Path $PackageRoot 'sqlscripts' }
+    }
     if (-not (Test-Path -LiteralPath $scripts)) { Fail 'SQLScripts folder was not found.' }
 
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
@@ -718,6 +877,23 @@ $isApi = $script:Cfg.serverType -eq 'Api'
 
 Write-Step "DeployVare manual deployment: $($script:Cfg.serverName)"
 Write-Step "[1] Administrator privileges... OK"
+Confirm-Settings $script:Cfg
+
+if ($script:Cfg.serverType -eq 'Database') {
+    # Database kit of a three-tier package: no IIS on this server
+    Write-Step "Database '$($script:Cfg.databaseName)' on $($script:Cfg.sqlDataSource)"
+    Ensure-DotNetRuntime $script:Cfg
+    if ([bool]$script:Cfg.freshDatabase) {
+        Ensure-SqlServer $script:Cfg
+        Restore-Database $script:Cfg
+    } else {
+        Assert-DatabaseExists $script:Cfg
+    }
+    Assert-MigratableDatabase $script:Cfg
+    Invoke-DbMigrator $script:Cfg
+    Write-Host 'Database deployment completed successfully. Deploy the api kit next.'
+    exit 0
+}
 
 Ensure-Iis
 Ensure-DotNet $script:Cfg
@@ -727,19 +903,16 @@ Ensure-Site $script:Cfg
 $thumb = Ensure-Certificate $script:Cfg
 Ensure-Bindings $script:Cfg $thumb
 
-if ($isApi -and [bool]$script:Cfg.freshDatabase) {
-    Ensure-SqlServer $script:Cfg
-    Restore-Database $script:Cfg
-} elseif ($isApi -and $script:Cfg.databaseName) {
-    Write-Step "Existing Database: will not restore. Validating '$($script:Cfg.databaseName)' on $($script:Cfg.sqlDataSource)..."
-    $check = New-DvSqlConnection ([string]$script:Cfg.sqlDataSource) 'master'
-    try {
-        $cmd = $check.CreateCommand()
-        $cmd.CommandText = 'SELECT CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END'
-        $null = $cmd.Parameters.AddWithValue('@database', [string]$script:Cfg.databaseName)
-        if ([int]$cmd.ExecuteScalar() -ne 1) { Fail "Database '$($script:Cfg.databaseName)' does not exist. Choose Fresh Database or create it first." }
-        Write-Step "[OK] Database '$($script:Cfg.databaseName)' exists"
-    } finally { $check.Close() }
+if ($isApi -and (Test-RunsDatabase $script:Cfg)) {
+    if ([bool]$script:Cfg.freshDatabase) {
+        Ensure-SqlServer $script:Cfg
+        Restore-Database $script:Cfg
+    } elseif ($script:Cfg.databaseName) {
+        Assert-DatabaseExists $script:Cfg
+    }
+    Assert-MigratableDatabase $script:Cfg
+} elseif ($isApi) {
+    Write-Step 'Database is deployed by the database kit of this package (SQL Server, restore and DbMigrator are not run here).'
 }
 
 Import-Module WebAdministration
