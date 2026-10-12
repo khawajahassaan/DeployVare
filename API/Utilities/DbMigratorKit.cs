@@ -60,8 +60,10 @@ public static class DbMigratorKit
     }
 
     /// <summary>
-    /// Relative paths DbMigrator needs, from DbMigrator.deps.json; null when the list is missing or names a
-    /// runtime assembly that is not in the folder (then trimming would ship a broken tool).
+    /// Relative paths DbMigrator needs, from DbMigrator.deps.json; null when the list is missing. An assembly the list
+    /// names but the folder lacks is skipped, not fatal: the API publish leaves out what ASP.NET Core already ships
+    /// (Microsoft.Extensions.*, EventLog, Pkcs), and DbMigrator runs without them (they load only on demand), exactly
+    /// as it does from the API folder itself. Copying the whole folder instead added hundreds of MB of API files.
     /// </summary>
     private static List<string>? TrimmedFileList(string baseDir)
     {
@@ -107,8 +109,7 @@ public static class DbMigratorKit
                 foreach (var asset in assets.EnumerateObject())
                 {
                     var fileName = Path.GetFileName(asset.Name);
-                    if (!File.Exists(Path.Combine(baseDir, fileName))) return null;
-                    files.Add(fileName);
+                    if (File.Exists(Path.Combine(baseDir, fileName))) files.Add(fileName);
                 }
             }
 

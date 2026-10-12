@@ -99,15 +99,19 @@ public class DbMigratorKitTests : IDisposable
     }
 
     [Fact]
-    public void Copy_WhenAListedAssemblyIsMissing_DoesNotShipABrokenTrimmedTool()
+    public void Copy_WhenAListedAssemblyIsNotInTheFolder_StillTrims_AndSkipsIt()
     {
+        // The API publish leaves out what ASP.NET Core ships; DbMigrator loads those only on demand
         var destination = Path.Combine(_root, "kit");
 
         var result = DbMigratorKit.Copy(PublishedApi(dropSqlClient: true), destination);
 
-        Assert.False(result.Trimmed);
-        Assert.Contains("DbMigrator.exe", Listing(destination));
-        Assert.Contains("dbup-sqlserver.dll", Listing(destination));
+        Assert.True(result.Trimmed);
+        var listing = Listing(destination);
+        Assert.Contains("DbMigrator.exe", listing);
+        Assert.Contains("dbup-sqlserver.dll", listing);
+        Assert.DoesNotContain("Microsoft.Data.SqlClient.dll", listing);
+        Assert.DoesNotContain("wwwroot/index.html", listing);
     }
 
     [Fact]

@@ -12,7 +12,9 @@ param(
     [string]$DatabaseName,
     [string]$SqlDataSource,
     [string]$SqlInstanceName,
-    [string]$InstallersPath
+    [string]$InstallersPath,
+    # Only choose and bind the HTTPS certificate of an already deployed site (no files, database or IIS changes)
+    [switch]$FixCertificate
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -489,21 +491,100 @@ function Ensure-Site([object]$Cfg) {
     & icacls $path /grant ('IIS AppPool\' + $poolName + ':(OI)(CI)RX') /Q | Out-Null
 }
 
-function Get-DefaultThumbprint([object]$Cfg) {
+# DNS names from the Subject Alternative Name extension (DnsNameList on Windows), plus the subject CN.
+function Get-CertDnsNames([System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert) {
+    $names = @()
+    if ($Cert.PSObject.Properties['DnsNameList']) { $names += @($Cert.DnsNameList | ForEach-Object { [string]$_.Unicode }) }
+    if (-not ($names | Where-Object { $_ })) {
+        $san = $Cert.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' } | Select-Object -First 1
+        if ($san) { $names += @([regex]::Matches($san.Format($false), '(?i)DNS[^=:,]*[=:]\s*([^,\r\n]+)') | ForEach-Object { $_.Groups[1].Value.Trim() }) }
+        $cn = [regex]::Match($Cert.Subject, '(?i)(?:^|,\s*)CN=([^,]+)')
+        if ($cn.Success) { $names += $cn.Groups[1].Value.Trim() }
+    }
+    return @($names | Where-Object { $_ } | Select-Object -Unique)
+}
+
+# True when the certificate names the host: exactly, or by a one-level wildcard (*.client.com covers app.client.com).
+function Test-CertCoversHost([System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert, [string]$HostName) {
+    if (-not $HostName) { return $false }
+    foreach ($n in (Get-CertDnsNames $Cert)) {
+        if ($n -ieq $HostName) { return $true }
+        if ($n.StartsWith('*.')) {
+            $suffix = $n.Substring(1)
+            $label = $HostName.Substring(0, [Math]::Max(0, $HostName.Length - $suffix.Length))
+            if ($HostName.EndsWith($suffix, [StringComparison]::OrdinalIgnoreCase) -and $label -and -not $label.Contains('.')) { return $true }
+        }
+    }
+    return $false
+}
+
+# Chains to a root this server trusts (revocation not checked, so it also works offline). Self-signed fails.
+function Test-CertTrusted([System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert) {
+    $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+    $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+    try { return $chain.Build($Cert) -and ($Cert.Subject -ne $Cert.Issuer) } finally { $chain.Reset() }
+}
+
+function Test-CertForServers([System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert) {
+    $eku = $Cert.Extensions | Where-Object { $_ -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension] } | Select-Object -First 1
+    if (-not $eku) { return $true }
+    return @($eku.EnhancedKeyUsages | ForEach-Object { $_.Value }) -contains '1.3.6.1.5.5.7.3.1'
+}
+
+function Get-UsableCertificates {
+    $now = Get-Date
+    return @(Get-ChildItem Cert:\LocalMachine\My | Where-Object {
+        $_.HasPrivateKey -and $_.NotBefore -le $now -and $_.NotAfter -gt $now -and (Test-CertForServers $_)
+    })
+}
+
+# Best certificate for the host: covers it and is trusted, else covers it (e.g. an internal CA). Latest expiry wins.
+function Find-HostCertificate([string]$HostName) {
+    $covering = @(Get-UsableCertificates | Where-Object { Test-CertCoversHost $_ $HostName })
+    $trusted = @($covering | Where-Object { Test-CertTrusted $_ })
+    $pick = if ($trusted.Count) { $trusted } else { $covering }
+    return $pick | Sort-Object NotAfter -Descending | Select-Object -First 1
+}
+
+# Old behaviour, now only the fallback: the named default (WMSVC-SHA2) or the newest usable certificate.
+function Get-FallbackCertificate([object]$Cfg) {
     $name = [string]$Cfg.defaultCertificateName
     if (-not $name) { $name = 'WMSVC-SHA2' }
-    $now = Get-Date
-    $match = Get-ChildItem Cert:\LocalMachine\My | Where-Object {
-        $_.HasPrivateKey -and $_.NotAfter -gt $now -and $_.FriendlyName -eq $name
-    } | Select-Object -First 1
-    if ($match) { return $match.Thumbprint }
-    return Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.HasPrivateKey -and $_.NotAfter -gt $now } |
-        Sort-Object NotAfter -Descending |
-        Select-Object -First 1 -ExpandProperty Thumbprint
+    $usable = Get-UsableCertificates
+    $match = $usable | Where-Object { $_.FriendlyName -eq $name } | Select-Object -First 1
+    if ($match) { return $match }
+    return $usable | Sort-Object NotAfter -Descending | Select-Object -First 1
+}
+
+function Describe-Cert([System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert) {
+    $label = if ($Cert.FriendlyName) { $Cert.FriendlyName } else { ($Cert.Subject -split ',')[0] -replace '^CN=', '' }
+    return "$label (expires $($Cert.NotAfter.ToString('yyyy-MM-dd')), $($Cert.Thumbprint))"
+}
+
+function Import-PfxInteractive([string]$HostName) {
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        $path = (Read-Host '  Full path of the .pfx file on this server').Trim().Trim('"')
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { Write-Host '  File not found.'; continue }
+        $secure = Read-Host '  Password for the .pfx (blank if none, not logged)' -AsSecureString
+        try {
+            $imported = Import-PfxCertificate -FilePath $path -CertStoreLocation 'Cert:\LocalMachine\My' -Password $secure -Exportable:$false
+        } catch {
+            Write-Host "  Could not import it: $($_.Exception.Message)"
+            continue
+        }
+        $cert = @($imported) | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
+        if (-not $cert) { Write-Host '  That file has no private key. Export the certificate WITH its private key.'; continue }
+        if (-not (Test-CertCoversHost $cert $HostName)) {
+            Write-Host "  [WARN] $(Describe-Cert $cert) does not cover $HostName; browsers will warn about the name."
+        }
+        return $cert
+    }
+    return $null
 }
 
 function Ensure-Certificate([object]$Cfg) {
     $mode = [string]$Cfg.certificateMode
+    $hostName = [string]$Cfg.siteHostName
     if ($mode -eq 'UserProvided') {
         $relative = [string]$Cfg.certificateFile
         if (-not $relative) { Fail 'Certificate mode is UserProvided but certificateFile is not set in deploy-config.json.' }
@@ -518,16 +599,55 @@ function Ensure-Certificate([object]$Cfg) {
         $imported = Import-PfxCertificate -FilePath $full -CertStoreLocation 'Cert:\LocalMachine\My' -Password $secure
         $cert = @($imported) | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
         if (-not $cert) { Fail 'The certificate file does not contain a private key.' }
-        Write-Step "[OK] Imported certificate $($cert.Subject)"
+        if (-not (Test-CertCoversHost $cert $hostName)) {
+            Write-Step "[WARN] The packaged certificate does not cover $hostName; browsers will warn about the name."
+        }
+        Write-Step "[OK] Imported certificate $(Describe-Cert $cert)"
         return $cert.Thumbprint
     }
 
-    $thumb = Get-DefaultThumbprint $Cfg
-    if (-not $thumb) {
-        Fail "No valid certificate with a private key was found in LocalMachine\My (including $($Cfg.defaultCertificateName)). Re-generate the package with your own .pfx."
+    # Default: a certificate already on this server that covers the host name
+    $cert = Find-HostCertificate $hostName
+    if ($cert) {
+        $trust = if (Test-CertTrusted $cert) { 'trusted' } else { 'not trusted by this server - check the issuing CA' }
+        Write-Step "[OK] Using certificate for ${hostName}: $(Describe-Cert $cert), $trust"
+        return $cert.Thumbprint
     }
-    Write-Step "[OK] Using installed certificate $thumb"
-    return $thumb
+
+    $fallback = Get-FallbackCertificate $Cfg
+    $ask = (-not $UseDefaults) -and [Environment]::UserInteractive
+    Write-Host ''
+    Write-Host "  No certificate for $hostName is installed on this server."
+    if ($fallback) {
+        Write-Host "  The only option here is $(Describe-Cert $fallback), which browsers show as 'Not secure'."
+    }
+    if ($ask) {
+        Write-Host '    [1] Import a .pfx from this server (e.g. the company certificate or wildcard *.domain)'
+        if ($fallback) { Write-Host "    [2] Continue with $(if ($fallback.FriendlyName) { $fallback.FriendlyName } else { 'that certificate' }) for now (bind the real one later)" }
+        Write-Host '    [3] Stop'
+        for ($attempt = 0; $attempt -lt 5; $attempt++) {
+            $choice = (Read-Host '  Choose 1, 2 or 3').Trim()
+            if ($choice -eq '1') {
+                $cert = Import-PfxInteractive $hostName
+                if ($cert) {
+                    Write-Step "[OK] Imported certificate $(Describe-Cert $cert)"
+                    return $cert.Thumbprint
+                }
+                Write-Host '  No certificate was imported.'
+            } elseif ($choice -eq '2' -and $fallback) {
+                break
+            } elseif ($choice -eq '3') {
+                Fail "Stopped: no certificate for $hostName. Install one and run Deploy.ps1 again (or Deploy.ps1 -FixCertificate after deploying)."
+            }
+        }
+    }
+    if (-not $fallback) {
+        Fail "No valid certificate with a private key was found in LocalMachine\My. Import one for $hostName, or download the package again with your own .pfx."
+    }
+    Write-Step "[WARN] Using $(Describe-Cert $fallback), which does not cover ${hostName}: browsers will show 'Not secure'."
+    Write-Step "[WARN] When the real certificate is installed, run: .\Deploy.ps1 -FixCertificate"
+    $script:CertificateWarning = $true
+    return $fallback.Thumbprint
 }
 
 function Ensure-Bindings([object]$Cfg, [string]$Thumbprint) {
@@ -1017,6 +1137,15 @@ Write-Step "DeployVare manual deployment: $($script:Cfg.serverName)"
 Write-Step "[1] Administrator privileges... OK"
 Confirm-Settings $script:Cfg
 
+if ($FixCertificate) {
+    # Re-bind HTTPS on a site that is already deployed: nothing else is touched
+    if ($script:Cfg.serverType -eq 'Database') { Fail 'The database kit has no website; run -FixCertificate with the API or frontend kit.' }
+    $thumb = Ensure-Certificate $script:Cfg
+    Ensure-Bindings $script:Cfg $thumb
+    Write-Host "Certificate bound to https://$($script:Cfg.siteHostName)."
+    exit 0
+}
+
 if ($script:Cfg.serverType -eq 'Database') {
     # Database kit of a three-tier package: no IIS on this server
     Write-Step "Database '$($script:Cfg.databaseName)' on $($script:Cfg.sqlDataSource)"
@@ -1071,5 +1200,9 @@ if ($licensedPending) {
 
 Start-Site $script:Cfg
 $script:AppPoolStopped = $false
+if ($script:CertificateWarning) {
+    Write-Host "NOTE: https://$($script:Cfg.siteHostName) uses a certificate that does not cover it, so browsers show 'Not secure'."
+    Write-Host '      Install the real certificate, then run .\Deploy.ps1 -FixCertificate in this folder.'
+}
 Write-Host 'Deployment completed successfully.'
 exit 0

@@ -1639,8 +1639,8 @@ export default function AppDeployPage() {
                   <span className="font-medium">Use existing / default certificate</span>
                   <span className="block text-xs text-muted-foreground">
                     {isTiered
-                      ? 'WMSVC-SHA2 or another cert already in LocalMachine\\My, used for both sites.'
-                      : 'WMSVC-SHA2 or another cert already in LocalMachine\\My.'}
+                      ? 'Each site uses a certificate already on its server that covers its host name (e.g. a *.client.com wildcard). If there is none, Deploy.ps1 offers to import a .pfx there, or continue with a self-signed one that browsers show as Not secure.'
+                      : 'Uses a certificate already on the server that covers the host name (e.g. a *.client.com wildcard). If there is none, Deploy.ps1 offers to import a .pfx there, or continue with a self-signed one that browsers show as Not secure.'}
                   </span>
                 </span>
               </label>

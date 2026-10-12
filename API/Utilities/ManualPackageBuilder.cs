@@ -158,7 +158,8 @@ public static class ManualPackageBuilder
         text.AppendLine($"IIS Physical Path:  {config.DeploymentPath}");
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
         text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
-        text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
+        text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "A certificate already on the server that covers the host name (asks to import a .pfx when there is none)")}");
+        text.AppendLine("HTTPS certificate:  Run .\\Deploy.ps1 -FixCertificate later to bind the real certificate to the deployed site.");
         text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - anything missing (" + (config.ServerType == "Frontend" ? "IIS URL Rewrite" : ".NET Hosting Bundle, .NET SDK, Memurai") + (config.FreshDatabase ? ", SQL Server Express" : "") + ") is installed from -InstallersPath or C:\\DeployVare\\Installers, otherwise downloaded from its official source")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");

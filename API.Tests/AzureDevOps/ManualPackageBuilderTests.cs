@@ -235,6 +235,18 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
+    public void DeployScript_PicksTheCertificateByHostName_AndCanFixItLater()
+    {
+        var script = ManualPackageBuilder.LoadDeployScript();
+        Assert.Contains("[switch]$FixCertificate", script);
+        Assert.Contains("function Find-HostCertificate", script);
+        Assert.Contains("function Test-CertCoversHost", script);
+        // the named self-signed default is only the fallback, chosen after the host-name match
+        Assert.True(script.IndexOf("Find-HostCertificate $hostName", StringComparison.Ordinal)
+            < script.IndexOf("Get-FallbackCertificate $Cfg", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void DeployScript_HandlesTheDatabaseKitAndAsksForNames()
     {
         var script = ManualPackageBuilder.LoadDeployScript();
