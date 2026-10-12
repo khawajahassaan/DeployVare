@@ -11,6 +11,12 @@ public class DeployVareDbContext : DbContext
     {
     }
 
+    // For provider-specific subclasses (PostgresDeployVareDbContext), which carry their own migrations
+    protected DeployVareDbContext(DbContextOptions options)
+        : base(options)
+    {
+    }
+
     public DbSet<User> Users { get; set; }
     public DbSet<UserPermission> UserPermissions { get; set; }
     public DbSet<Client> Clients { get; set; }
@@ -43,7 +49,8 @@ public class DeployVareDbContext : DbContext
 
         // Use the correct SQL function for the active database provider
         var isSqlite = Database.IsSqlite();
-        var nowSql = isSqlite ? "datetime('now')" : "GETUTCDATE()";
+        var isPostgres = Database.IsNpgsql();
+        var nowSql = isSqlite ? "datetime('now')" : isPostgres ? "(now() at time zone 'utc')" : "GETUTCDATE()";
 
         // Licence Configuration
         modelBuilder.Entity<License>(entity =>
@@ -101,7 +108,7 @@ public class DeployVareDbContext : DbContext
             // The database, not application code, enforces that only one machine holds a licence at a time
             entity.HasIndex(e => e.LicenseId)
                 .IsUnique()
-                .HasFilter(isSqlite ? "\"Status\" = 'Active'" : "[Status] = 'Active'")
+                .HasFilter(isSqlite || isPostgres ? "\"Status\" = 'Active'" : "[Status] = 'Active'")
                 .HasDatabaseName("UQ_License_ActiveActivation");
         });
 

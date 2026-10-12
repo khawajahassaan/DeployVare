@@ -7,6 +7,10 @@ using System.Security.Claims;
 using System.Text;
 using Serilog;
 
+// One-time SQL Server → PostgreSQL move of an existing database; runs instead of the web host
+if (args.Length > 0 && args[0].Equals("copy-to-postgres", StringComparison.OrdinalIgnoreCase))
+    return await PostgresCopier.RunAsync(args);
+
 // Disable automatic claim type mapping (prevents "sub" from overriding ClaimTypes.NameIdentifier)
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
@@ -24,8 +28,12 @@ if (string.IsNullOrEmpty(contentRoot))
     var macResourcesPath = Path.GetFullPath(Path.Combine(exeDir, "..", "Resources"));
     if (Directory.Exists(macResourcesPath) && File.Exists(Path.Combine(macResourcesPath, "appsettings.json")))
         contentRoot = macResourcesPath;
-    else
+    else if (File.Exists(Path.Combine(exeDir, "appsettings.json")))
         contentRoot = exeDir;
+    else
+        // Started as "dotnet API.dll" (Azure App Service, most hosts) or by IIS: the process is dotnet / w3wp,
+        // not the app, so its folder has no appsettings.json - use the folder the app was loaded from
+        contentRoot = AppContext.BaseDirectory;
 }
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -116,17 +124,30 @@ builder.Services.AddSwaggerGen(options =>
 // Configure Database – read DB_PROVIDER env var set by the Tauri sidecar launcher.
 // "sqlite"    → SQLite file stored next to the app (default / local mode)
 // "sqlserver" → SQL Server (cloud / enterprise mode, requires a connection string)
+// "postgres"  → PostgreSQL (e.g. Supabase); DB_CONNECTION_STRING is an Npgsql connection string
 var dbProvider = "sqlserver";//(Environment.GetEnvironmentVariable("DB_PROVIDER") ?? "sqlite").ToLowerInvariant();
+var requestedProvider = Environment.GetEnvironmentVariable("DB_PROVIDER")?.Trim().ToLowerInvariant();
+if (requestedProvider is "postgres" or "postgresql")
+    dbProvider = "postgres";
 var dbConnStr = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
                 ?? builder.Configuration.GetConnectionString("DeployVareDb")!;
 
-builder.Services.AddDbContext<DeployVareDbContext>(options =>
+if (dbProvider == "postgres")
 {
-    if (dbProvider == "sqlserver")
-        options.UseSqlServer(dbConnStr);
-    else
-        options.UseSqlite(dbConnStr);
-});
+    PostgresSetup.ConfigureNpgsql();
+    // The app keeps injecting DeployVareDbContext; the Postgres subclass brings its own migrations
+    builder.Services.AddDbContext<DeployVareDbContext, PostgresDeployVareDbContext>(options => options.UseNpgsql(dbConnStr));
+}
+else
+{
+    builder.Services.AddDbContext<DeployVareDbContext>(options =>
+    {
+        if (dbProvider == "sqlserver")
+            options.UseSqlServer(dbConnStr);
+        else
+            options.UseSqlite(dbConnStr);
+    });
+}
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -171,10 +192,20 @@ builder.Services.AddAuthorization(options =>
 // Configure CORS
 builder.Services.AddCors(options =>
 {
+    // CORS_ALLOWED_ORIGINS (comma-separated, e.g. https://deployvare.vercel.app) limits a public deployment to
+    // its own frontend; unset keeps the previous allow-any-origin behaviour (desktop app, local development)
+    var allowedOrigins = (Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") ?? builder.Configuration["Cors:AllowedOrigins"] ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(o => o.TrimEnd('/'))
+        .ToArray();
+
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
+        if (allowedOrigins.Length > 0)
+            policy.WithOrigins(allowedOrigins);
+        else
+            policy.AllowAnyOrigin();
+        policy.AllowAnyMethod()
               .AllowAnyHeader();
     });
 });
@@ -250,10 +281,10 @@ using (var scope = app.Services.CreateScope())
     {
         // For SQLite: EnsureCreated is sufficient (no migrations infra needed).
         // For SQL Server: run pending migrations as before.
-        if (dbProvider == "sqlserver")
+        if (dbProvider is "sqlserver" or "postgres")
         {
             await context.Database.MigrateAsync();
-            Log.Information("Database migrations applied successfully");
+            Log.Information("Database migrations applied successfully ({Provider})", dbProvider);
         }
         else
         {
@@ -291,3 +322,4 @@ app.MapControllers();
 Log.Information("DeployVare API Started");
 
 app.Run();
+return 0;
