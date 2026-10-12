@@ -100,7 +100,8 @@ public class ApiDeploymentsController : ControllerBase
         var started = _operations.Start(operationId, userId, "package", async (services, cancellationToken) =>
         {
             var package = await services.GetRequiredService<IManualPackageService>().BuildAsync(request, cancellationToken);
-            _operations.AttachFile(operationId, package.ZipPath, package.FileName);
+            foreach (var file in package.Files)
+                _operations.AttachFile(operationId, file.Path, file.FileName, file.Tier);
             return new { package.FileName, package.AppFileCount, package.SqlFileCount, package.ContentFolders };
         });
 
@@ -124,11 +125,11 @@ public class ApiDeploymentsController : ControllerBase
     /// </summary>
     [AllowAnonymous]
     [HttpGet("operations/{operationId}/download")]
-    public IActionResult DownloadOperationFile(string operationId, [FromQuery] string? token)
+    public IActionResult DownloadOperationFile(string operationId, [FromQuery] string? token, [FromQuery] int file = 0)
     {
-        var file = _operations.GetFile(operationId, token);
-        if (file == null) return NotFound(new { error = "This download link is invalid or has expired. Build the package again." });
-        return PhysicalFile(file.Path, "application/zip", file.FileName, enableRangeProcessing: true);
+        var found = _operations.GetFile(operationId, token, file);
+        if (found == null) return NotFound(new { error = "This download link is invalid or has expired. Build the package again." });
+        return PhysicalFile(found.Path, "application/zip", found.FileName, enableRangeProcessing: true);
     }
 
     /// <summary>
@@ -359,6 +360,17 @@ public class ApiDeploymentsController : ControllerBase
 
             // Delete the file when the response has been sent, and the temporary folder afterwards
             var workspace = Path.GetDirectoryName(package.ZipPath)!;
+            var zipPath = package.ZipPath;
+            var fileName = package.FileName;
+            if (package.Files.Count > 1)
+            {
+                // This one-response endpoint cannot send several files: the tier zips go out inside one stored zip
+                fileName = Path.GetFileNameWithoutExtension(package.FileName) + "_all-tiers.zip";
+                zipPath = Path.Combine(workspace, fileName);
+                using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+                    foreach (var tierFile in package.Files)
+                        System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(archive, tierFile.Path, tierFile.FileName, System.IO.Compression.CompressionLevel.NoCompression);
+            }
             Response.OnCompleted(() =>
             {
                 try { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
@@ -366,10 +378,10 @@ public class ApiDeploymentsController : ControllerBase
                 return Task.CompletedTask;
             });
 
-            var stream = new FileStream(package.ZipPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+            var stream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read,
                 bufferSize: 64 * 1024, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
 
-            return File(stream, "application/zip", package.FileName);
+            return File(stream, "application/zip", fileName);
         }
         catch (InvalidOperationException ex)
         {

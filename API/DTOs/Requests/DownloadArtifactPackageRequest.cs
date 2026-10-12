@@ -56,10 +56,22 @@ public class DownloadArtifactPackageRequest
     public string? CertificateTempPath { get; set; }
 
     /// <summary>
-    /// When true, the download is one zip with both the API kit and the frontend kit.
-    /// This-server-only packages stay unchanged when the field is omitted.
+    /// Older clients: true means a three-tier download. Superseded by <see cref="Layout"/>.
     /// </summary>
     public bool Combined { get; set; }
+
+    /// <summary>
+    /// ThisServer (the default) is one zip for the selected server. TwoTier is an API zip that also sets up the database,
+    /// plus a frontend zip. ThreeTier is database, API and frontend zips. Every tier zip carries Deploy-AllTiers.ps1.
+    /// </summary>
+    public PackageLayout Layout { get; set; } = PackageLayout.ThisServer;
+
+    /// <summary>The layout actually built: <see cref="Layout"/>, or ThreeTier for an older client sending Combined.</summary>
+    public PackageLayout EffectiveLayout => Layout != PackageLayout.ThisServer ? Layout : Combined ? PackageLayout.ThreeTier : PackageLayout.ThisServer;
+
+    /// <summary>Set by the server for the kits of one two- or three-tier download (deploy-config.json packageSetId).</summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public string? PackageSetId { get; set; }
 
     /// <summary>
     /// Adds the offline installers (.NET Hosting Bundle, SDK, Memurai, URL Rewrite, SQL Express). Off makes a much smaller
@@ -77,4 +89,11 @@ public class DownloadArtifactPackageRequest
     /// <summary>HTTPS host name for the counterpart site (the selected server still uses <see cref="SiteHostName"/>).</summary>
     [MaxLength(253)]
     public string? CounterpartSiteHostName { get; set; }
+}
+
+public enum PackageLayout
+{
+    ThisServer,
+    TwoTier,
+    ThreeTier
 }

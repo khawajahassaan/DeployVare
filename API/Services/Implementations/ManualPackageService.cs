@@ -72,26 +72,41 @@ public class ManualPackageService : IManualPackageService
         ("zip", "Create the zip"),
     };
 
-    private static readonly (string Key, string Label)[] CombinedStages =
+    private static readonly (string Key, string Label)[] TwoTierStages =
+    {
+        ("api-download", "API: download the build artifact"),
+        ("api-scripts", "API: download the SQL scripts"),
+        ("api-kit", "API + database: assemble the zip"),
+        ("frontend-download", "Frontend: download the build artifact"),
+        ("frontend-kit", "Frontend: assemble the zip"),
+    };
+
+    private static readonly (string Key, string Label)[] ThreeTierStages =
     {
         ("api-download", "API: download the build artifact"),
         ("api-scripts", "API: download the SQL scripts"),
         ("api-kit", "API: assemble the kit"),
         ("frontend-download", "Frontend: download the build artifact"),
-        ("frontend-kit", "Frontend: assemble the kit"),
+        ("frontend-kit", "Frontend: assemble the zip"),
         ("database-kit", "Database: assemble the kit (DbMigrator, scripts, installers, backup)"),
-        ("zip", "Create the three-tier zip"),
+        ("zip", "Create the database and API zips"),
     };
 
     public async Task<ManualPackageResult> BuildAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken = default)
     {
         var stages = new StageReporter(_progress, request.ProgressId, "");
-        _progress.Start(request.ProgressId, 0, request.Combined ? CombinedStages : SingleStages);
+        var layout = request.EffectiveLayout;
+        _progress.Start(request.ProgressId, 0, layout switch
+        {
+            PackageLayout.TwoTier => TwoTierStages,
+            PackageLayout.ThreeTier => ThreeTierStages,
+            _ => SingleStages
+        });
         try
         {
-            var result = request.Combined
-                ? await BuildCombinedAsync(request, stages, cancellationToken)
-                : await BuildSingleAsync(request, certificatePath: null, separateDatabase: false, stages, zipIsOwnStage: true, cancellationToken);
+            var result = layout == PackageLayout.ThisServer
+                ? await BuildSingleAsync(request, certificatePath: null, separateDatabase: false, stages, zipIsOwnStage: true, cancellationToken)
+                : await BuildTieredAsync(request, layout == PackageLayout.ThreeTier, stages, cancellationToken);
             _progress.Finish(request.ProgressId, succeeded: true);
             return result;
         }
@@ -124,7 +139,12 @@ public class ManualPackageService : IManualPackageService
         : bytes >= 1024 * 1024 ? $"{bytes / (1024d * 1024):0.0} MB"
         : $"{Math.Max(1, bytes / 1024)} KB";
 
-    private async Task<ManualPackageResult> BuildCombinedAsync(DownloadArtifactPackageRequest request, StageReporter stages, CancellationToken cancellationToken)
+    /// <summary>
+    /// Two tiers: an API zip that also sets up the database, and a frontend zip. Three tiers: database, API and frontend
+    /// zips. Each zip is a complete kit for its own server and carries Deploy-AllTiers.ps1 for an all-in-one install.
+    /// </summary>
+    private async Task<ManualPackageResult> BuildTieredAsync(
+        DownloadArtifactPackageRequest request, bool threeTier, StageReporter stages, CancellationToken cancellationToken)
     {
         var selectedContext = await _azureDevOpsConfigService.ResolveDeploymentContextAsync(
             request.ApplicationServerId, request.Environment, cancellationToken);
@@ -146,6 +166,7 @@ public class ManualPackageService : IManualPackageService
         string? certificateTemp = null;
         ManualPackageResult? apiPackage = null;
         ManualPackageResult? frontendPackage = null;
+        var setId = Guid.NewGuid().ToString("N");
         var workspace = Path.Combine(Path.GetTempPath(), "DeployVare", "packages", $"{Guid.NewGuid():N}");
         Directory.CreateDirectory(workspace);
 
@@ -159,63 +180,70 @@ public class ManualPackageService : IManualPackageService
             var (frontendBuildId, frontendArtifact) = await ResolveBuildAsync(
                 frontendServer.Id, request, selected.ServerType == ServerType.Frontend, cancellationToken);
 
-            var apiRequest = ForInnerServer(request, apiServer.Id, apiBuildId, apiArtifact, apiHost, isApi: true);
-            var frontendRequest = ForInnerServer(request, frontendServer.Id, frontendBuildId, frontendArtifact, frontendHost, isApi: false);
+            var apiRequest = ForInnerServer(request, apiServer.Id, apiBuildId, apiArtifact, apiHost, isApi: true, setId, threeTier);
+            var frontendRequest = ForInnerServer(request, frontendServer.Id, frontendBuildId, frontendArtifact, frontendHost, isApi: false, setId, threeTier);
 
-            // Three tiers: the API kit leaves SQL Server, the restore and DbMigrator to the database kit
-            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, separateDatabase: true, stages.For("api-"), zipIsOwnStage: false, cancellationToken);
+            // Three tiers: the API kit leaves SQL Server, the restore and DbMigrator to the database kit.
+            // Two tiers: the API kit handles the database itself, exactly like a this-server API package.
+            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, separateDatabase: threeTier, stages.For("api-"), zipIsOwnStage: false, cancellationToken);
             frontendPackage = await BuildSingleAsync(frontendRequest, certificateTemp, separateDatabase: false, stages.For("frontend-"), zipIsOwnStage: false, cancellationToken);
-
-            stages.Begin("database-kit");
-            stages.Report("database-kit", "Unpacking the API and frontend kits");
-
-            var apiDir = Path.Combine(workspace, ManualPackageBuilder.ApiKitFolder);
-            var frontendDir = Path.Combine(workspace, ManualPackageBuilder.FrontendKitFolder);
-            ZipFile.ExtractToDirectory(apiPackage.ZipPath, apiDir);
-            ZipFile.ExtractToDirectory(frontendPackage.ZipPath, frontendDir);
 
             var applicationName = selected.Application?.Name ?? selected.ServerName;
             var apiBuildNumber = ExtractBuildNumber(apiPackage.FileName);
             var frontendBuildNumber = ExtractBuildNumber(frontendPackage.FileName);
 
-            var databaseDir = Path.Combine(workspace, ManualPackageBuilder.DatabaseKitFolder);
-            stages.Report("database-kit", "Copying DbMigrator, SQL scripts, installers and the baseline backup");
-            var (databaseConfig, databaseDetail) = BuildDatabaseKit(apiDir, databaseDir, apiServer, request, apiBuildNumber, apiPackage.SqlFileCount);
-            stages.Done("database-kit", databaseDetail);
-            var fileName = ManualPackageBuilder.BuildCombinedFileName(applicationName, apiBuildNumber, frontendBuildNumber);
-            var zipPath = Path.Combine(workspace, fileName);
+            var files = new List<ManualPackageFile>();
+            var frontendZip = Path.Combine(workspace, ManualPackageBuilder.BuildTierFileName(applicationName, "frontend", frontendBuildNumber));
+            File.Move(frontendPackage.ZipPath, frontendZip);
 
-            stages.Begin("zip");
+            if (threeTier)
+            {
+                stages.Begin("database-kit");
+                stages.Report("database-kit", "Unpacking the API kit");
+                var apiDir = Path.Combine(workspace, ManualPackageBuilder.ApiKitFolder);
+                ZipFile.ExtractToDirectory(apiPackage.ZipPath, apiDir);
 
-            await Task.Run(() => ManualPackageBuilder.BuildCombined(
-                zipPath,
-                apiDir,
-                frontendDir,
-                ManualPackageBuilder.BuildCombinedReadme(
-                    applicationName,
-                    apiServer.ServerName,
-                    apiBuildNumber,
-                    frontendServer.ServerName,
-                    frontendBuildNumber,
-                    hasDatabaseKit: true,
-                    freshDatabase: databaseConfig.FreshDatabase,
-                    databaseName: databaseConfig.DatabaseName),
-                ManualPackageBuilder.BuildCombinedDeployScript(),
-                databaseDir,
-                stages.Zip("zip", "Zipping")), cancellationToken);
-            stages.Done("zip", $"{fileName} ({Size(new FileInfo(zipPath).Length)})");
+                var databaseDir = Path.Combine(workspace, ManualPackageBuilder.DatabaseKitFolder);
+                stages.Report("database-kit", "Copying DbMigrator, SQL scripts, installers and the baseline backup");
+                var (_, databaseDetail) = BuildDatabaseKit(apiDir, databaseDir, apiServer, request, apiBuildNumber, apiPackage.SqlFileCount, setId);
+                stages.Done("database-kit", databaseDetail);
 
-            RemoveIntermediateFiles(workspace, zipPath);
+                stages.Begin("zip");
+                var databaseZip = Path.Combine(workspace, ManualPackageBuilder.BuildTierFileName(applicationName, "database", apiBuildNumber));
+                var apiZip = Path.Combine(workspace, ManualPackageBuilder.BuildTierFileName(applicationName, "api", apiBuildNumber));
+                await Task.Run(() =>
+                {
+                    ManualPackageBuilder.ZipDirectory(databaseDir, databaseZip, stages.Zip("zip", "Database zip"));
+                    ManualPackageBuilder.ZipDirectory(apiDir, apiZip, stages.Zip("zip", "API zip"));
+                }, cancellationToken);
+                stages.Done("zip", $"{Path.GetFileName(databaseZip)} ({Size(new FileInfo(databaseZip).Length)}), " +
+                    $"{Path.GetFileName(apiZip)} ({Size(new FileInfo(apiZip).Length)})");
 
-            _logger.LogInformation("CombinedManualPackageReady {FileName} api={Api} frontend={Frontend}",
-                fileName, apiPackage.FileName, frontendPackage.FileName);
+                files.Add(new ManualPackageFile(databaseZip, Path.GetFileName(databaseZip), "database"));
+                files.Add(new ManualPackageFile(apiZip, Path.GetFileName(apiZip), "api"));
+            }
+            else
+            {
+                var apiZip = Path.Combine(workspace, ManualPackageBuilder.BuildTierFileName(applicationName, "api", apiBuildNumber));
+                File.Move(apiPackage.ZipPath, apiZip);
+                files.Add(new ManualPackageFile(apiZip, Path.GetFileName(apiZip), "api"));
+            }
+            files.Add(new ManualPackageFile(frontendZip, Path.GetFileName(frontendZip), "frontend"));
+
+            RemoveIntermediateFiles(workspace, files.Select(f => f.Path).ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+            _logger.LogInformation("TieredManualPackageReady {Tiers} tiers: {Files}",
+                threeTier ? 3 : 2, string.Join(", ", files.Select(f => f.FileName)));
 
             return new ManualPackageResult(
-                zipPath,
-                fileName,
+                files[0].Path,
+                files[0].FileName,
                 apiPackage.AppFileCount + frontendPackage.AppFileCount,
                 apiPackage.SqlFileCount,
-                apiPackage.ContentFolders.Concat(frontendPackage.ContentFolders).ToList());
+                apiPackage.ContentFolders.Concat(frontendPackage.ContentFolders).ToList())
+            {
+                Files = files
+            };
         }
         catch
         {
@@ -258,7 +286,9 @@ public class ManualPackageService : IManualPackageService
         int buildId,
         string? artifactName,
         string siteHostName,
-        bool isApi)
+        bool isApi,
+        string packageSetId,
+        bool threeTier)
     {
         return new DownloadArtifactPackageRequest
         {
@@ -274,7 +304,8 @@ public class ManualPackageService : IManualPackageService
             SqlInstanceName = source.SqlInstanceName,
             DatabaseName = source.DatabaseName,
             IncludeInstallers = source.IncludeInstallers,
-            Combined = false
+            Layout = threeTier ? PackageLayout.ThreeTier : PackageLayout.TwoTier,
+            PackageSetId = packageSetId
         };
     }
 
@@ -436,6 +467,8 @@ public class ManualPackageService : IManualPackageService
                 LicenseFileName = licenseFile?.FileName,
                 HasScripts = scriptsDirectory != null,
                 IncludesInstallers = request.IncludeInstallers,
+                DownloadUrls = new Dictionary<string, string>(_setupOptions.InstallerDownloadUrls),
+                PackageSetId = request.PackageSetId,
                 ContentFolders = contentFolders.Select(f => f.Name).ToList(),
                 RequiredDotNetMajor = _setupOptions.RequiredDotNetMajorVersion,
                 MinimumSdkMajor = _setupOptions.MinimumSdkMajorVersion,
@@ -444,6 +477,15 @@ public class ManualPackageService : IManualPackageService
             };
 
             var readme = ManualPackageBuilder.BuildReadme(config, build.BuildNumber, keepPaths);
+            if (request.PackageSetId != null)
+            {
+                // A kit of a two- or three-tier download: it can also deploy every tier on one machine
+                var threeTier = request.Layout == PackageLayout.ThreeTier;
+                readme += Environment.NewLine + ManualPackageBuilder.BuildTierSetReadme(threeTier);
+                var allTiers = Path.Combine(workspace, ManualPackageBuilder.AllTiersScriptName);
+                await File.WriteAllTextAsync(allTiers, ManualPackageBuilder.BuildAllTiersScript(), new UTF8Encoding(false), cancellationToken);
+                extraFiles.Add((ManualPackageBuilder.AllTiersScriptName, allTiers));
+            }
             var fileName = ManualPackageBuilder.BuildFileName(server.ServerName, build.BuildNumber);
             var zipPath = Path.Combine(workspace, fileName);
             var deployScript = ManualPackageBuilder.LoadDeployScript();
@@ -471,7 +513,7 @@ public class ManualPackageService : IManualPackageService
                 ? $"{fileName} ({Size(new FileInfo(zipPath).Length)})"
                 : $"{package.Files.Count} app file(s), {extraFiles.Count} installer/extra file(s)");
 
-            RemoveIntermediateFiles(workspace, zipPath);
+            RemoveIntermediateFiles(workspace, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { zipPath });
 
             _logger.LogInformation("ManualPackageReady {FileName}: {AppFiles} app file(s), {SqlFiles} script(s), content folders [{Folders}]",
                 fileName, package.Files.Count, sqlFileCount, string.Join(", ", contentFolders.Select(f => f.Name)));
@@ -597,7 +639,8 @@ public class ManualPackageService : IManualPackageService
         ApplicationServer apiServer,
         DownloadArtifactPackageRequest request,
         string buildNumber,
-        int sqlFileCount)
+        int sqlFileCount,
+        string packageSetId)
     {
         Directory.CreateDirectory(databaseKitDirectory);
         var apiConfigPath = Path.Combine(apiKitDirectory, ManualPackageBuilder.ConfigName);
@@ -655,6 +698,8 @@ public class ManualPackageService : IManualPackageService
             DatabaseName = string.IsNullOrWhiteSpace(apiConfig.DatabaseName) ? "AuditVare" : apiConfig.DatabaseName,
             HasScripts = hasScripts,
             IncludesInstallers = request.IncludeInstallers,
+            DownloadUrls = new Dictionary<string, string>(_setupOptions.InstallerDownloadUrls),
+            PackageSetId = packageSetId,
             DbMigratorFolder = hasScripts ? ManualPackageBuilder.DbMigratorFolder : null,
             RequiredDotNetMajor = _setupOptions.RequiredDotNetMajorVersion,
             MinimumSdkMajor = _setupOptions.MinimumSdkMajorVersion,
@@ -666,7 +711,10 @@ public class ManualPackageService : IManualPackageService
         File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.DeployScriptName),
             ManualPackageBuilder.LoadDeployScript(), new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.ReadmeName),
-            ManualPackageBuilder.BuildDatabaseReadme(config, buildNumber, sqlFileCount), new UTF8Encoding(false));
+            ManualPackageBuilder.BuildDatabaseReadme(config, buildNumber, sqlFileCount) + Environment.NewLine
+            + ManualPackageBuilder.BuildTierSetReadme(threeTier: true), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.AllTiersScriptName),
+            ManualPackageBuilder.BuildAllTiersScript(), new UTF8Encoding(false));
 
         var detail = migratorDetail + (request.FreshDatabase ? ", SQL Express and the baseline backup" : "");
         return (config, detail);
@@ -787,14 +835,14 @@ public class ManualPackageService : IManualPackageService
             .ToList();
     }
 
-    private static void RemoveIntermediateFiles(string workspace, string zipPath)
+    private static void RemoveIntermediateFiles(string workspace, IReadOnlySet<string> keep)
     {
         foreach (var directory in Directory.GetDirectories(workspace))
             TryDeleteDirectory(directory);
 
         foreach (var file in Directory.GetFiles(workspace))
         {
-            if (file.Equals(zipPath, StringComparison.OrdinalIgnoreCase)) continue;
+            if (keep.Contains(file)) continue;
             try { File.Delete(file); } catch (IOException) { }
         }
     }

@@ -341,7 +341,19 @@ export interface BackgroundOperation {
   fileName?: string | null;
   fileSizeBytes?: number | null;
   downloadToken?: string | null;
+  /** Every zip of a package: one per tier for two- and three-tier downloads (download with operationDownloadUrl(..., index)). */
+  files?: BackgroundOperationFile[];
 }
+
+export interface BackgroundOperationFile {
+  index: number;
+  fileName: string;
+  sizeBytes: number;
+  tier?: 'server' | 'database' | 'api' | 'frontend' | string | null;
+}
+
+/** thisServer: one zip. twoTier: API (+ database) and frontend zips. threeTier: database, API and frontend zips. */
+export type PackageLayout = 'ThisServer' | 'TwoTier' | 'ThreeTier';
 
 export interface AzureArtifactDeployRequest {
   applicationServerId: number;
@@ -368,7 +380,7 @@ export interface PackageRequest {
   sqlInstanceName?: string;
   databaseName?: string;
   certificateFile?: File | null;
-  combined?: boolean;
+  layout?: PackageLayout;
   counterpartServerId?: number;
   counterpartSiteHostName?: string;
   /** The server reports its build stages under this ID (getDeploymentProgress) */
@@ -391,7 +403,7 @@ function buildPackageForm(data: PackageRequest): FormData {
   if (data.sqlInstanceName) form.append('sqlInstanceName', data.sqlInstanceName);
   if (data.databaseName) form.append('databaseName', data.databaseName);
   if (data.certificateFile) form.append('certificateFile', data.certificateFile);
-  form.append('combined', data.combined ? 'true' : 'false');
+  form.append('layout', data.layout ?? 'ThisServer');
   form.append('includeInstallers', data.includeInstallers === false ? 'false' : 'true');
   if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
   if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
@@ -1153,9 +1165,9 @@ export const api = {
     return response.data;
   },
 
-  /** Plain link to a finished package (no login header needed; the token is the key). */
-  operationDownloadUrl(operationId: string, token: string): string {
-    return `${resolveApiBaseUrl()}/apideployments/operations/${encodeURIComponent(operationId)}/download?token=${encodeURIComponent(token)}`;
+  /** Plain link to a finished package zip (no login header needed; the token is the key). */
+  operationDownloadUrl(operationId: string, token: string, fileIndex = 0): string {
+    return `${resolveApiBaseUrl()}/apideployments/operations/${encodeURIComponent(operationId)}/download?token=${encodeURIComponent(token)}&file=${fileIndex}`;
   },
 
   /** Live progress of an Azure DevOps deployment, or null until the API has started tracking it. */

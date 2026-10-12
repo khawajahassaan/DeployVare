@@ -22,10 +22,21 @@ public sealed class BackgroundOperationDto
     public DateTime? CompletedAt { get; set; }
     public object? Result { get; set; }
 
-    /// <summary>Package operations: the finished zip, downloadable with the token below (no login header needed).</summary>
+    /// <summary>Package operations: the first (or only) zip, downloadable with the token below (no login header needed).</summary>
     public string? FileName { get; set; }
     public long? FileSizeBytes { get; set; }
     public string? DownloadToken { get; set; }
+
+    /// <summary>Every zip of the package (one per tier for two- and three-tier downloads); download with ?file={Index}.</summary>
+    public List<BackgroundOperationFileDto> Files { get; set; } = new();
+}
+
+public sealed class BackgroundOperationFileDto
+{
+    public int Index { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public string? Tier { get; set; }
 }
 
 /// <summary>A finished package file, resolved by operation ID and download token.</summary>
@@ -45,11 +56,11 @@ public interface IBackgroundOperations
     /// <summary>The operation, or null when it is unknown or belongs to another user.</summary>
     BackgroundOperationDto? Get(string operationId, int userId);
 
-    /// <summary>Package file for a valid download token, or null.</summary>
-    BackgroundOperationFile? GetFile(string operationId, string? token);
+    /// <summary>Package file <paramref name="index"/> for a valid download token, or null.</summary>
+    BackgroundOperationFile? GetFile(string operationId, string? token, int index = 0);
 
-    /// <summary>Called by package work when the zip is ready, so the page can download it.</summary>
-    void AttachFile(string operationId, string path, string fileName);
+    /// <summary>Called by package work for each finished zip, so the page can download it. One token covers them all.</summary>
+    void AttachFile(string operationId, string path, string fileName, string? tier = null);
 }
 
 public sealed class BackgroundOperations : IBackgroundOperations
@@ -67,9 +78,7 @@ public sealed class BackgroundOperations : IBackgroundOperations
         public BackgroundOperationStatus Status { get; set; } = BackgroundOperationStatus.Running;
         public string? Error { get; set; }
         public object? Result { get; set; }
-        public string? FilePath { get; set; }
-        public string? FileName { get; set; }
-        public long? FileSize { get; set; }
+        public List<(string Path, string FileName, long Size, string? Tier)> Files { get; } = new();
         public string? DownloadToken { get; set; }
     }
 
@@ -137,14 +146,18 @@ public sealed class BackgroundOperations : IBackgroundOperations
                 StartedAt = operation.StartedAt,
                 CompletedAt = operation.CompletedAt,
                 Result = operation.Status == BackgroundOperationStatus.Succeeded ? operation.Result : null,
-                FileName = operation.FileName,
-                FileSizeBytes = operation.FileSize,
-                DownloadToken = operation.Status == BackgroundOperationStatus.Succeeded ? operation.DownloadToken : null
+                FileName = operation.Files.Count > 0 ? operation.Files[0].FileName : null,
+                FileSizeBytes = operation.Files.Count > 0 ? operation.Files[0].Size : null,
+                DownloadToken = operation.Status == BackgroundOperationStatus.Succeeded ? operation.DownloadToken : null,
+                Files = operation.Files.Select((f, i) => new BackgroundOperationFileDto
+                {
+                    Index = i, FileName = f.FileName, SizeBytes = f.Size, Tier = f.Tier
+                }).ToList()
             };
         }
     }
 
-    public BackgroundOperationFile? GetFile(string operationId, string? token)
+    public BackgroundOperationFile? GetFile(string operationId, string? token, int index = 0)
     {
         if (string.IsNullOrEmpty(token) || !_operations.TryGetValue(operationId, out var operation)) return null;
         lock (operation)
@@ -153,22 +166,20 @@ public sealed class BackgroundOperations : IBackgroundOperations
             var expected = System.Text.Encoding.ASCII.GetBytes(operation.DownloadToken);
             var given = System.Text.Encoding.ASCII.GetBytes(token);
             if (!CryptographicOperations.FixedTimeEquals(expected, given)) return null;
-            return operation.FilePath != null && File.Exists(operation.FilePath)
-                ? new BackgroundOperationFile(operation.FilePath, operation.FileName ?? Path.GetFileName(operation.FilePath))
-                : null;
+            if (index < 0 || index >= operation.Files.Count) return null;
+            var file = operation.Files[index];
+            return File.Exists(file.Path) ? new BackgroundOperationFile(file.Path, file.FileName) : null;
         }
     }
 
-    public void AttachFile(string operationId, string path, string fileName)
+    public void AttachFile(string operationId, string path, string fileName, string? tier = null)
     {
         if (!_operations.TryGetValue(operationId, out var operation)) return;
         lock (operation)
         {
-            operation.FilePath = path;
-            operation.FileName = fileName;
-            operation.FileSize = new FileInfo(path).Length;
+            operation.Files.Add((path, fileName, new FileInfo(path).Length, tier));
             // 256-bit random, URL-safe: the download link works without the login header, so the token is the key
-            operation.DownloadToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            operation.DownloadToken ??= Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
                 .Replace('+', '-').Replace('/', '_').TrimEnd('=');
         }
     }
@@ -180,22 +191,22 @@ public sealed class BackgroundOperations : IBackgroundOperations
         {
             if (operation.CompletedAt is not DateTime done || done >= cutoff) continue;
             if (!_operations.TryRemove(key, out _)) continue;
-            DeleteFile(operation.FilePath);
+            foreach (var folder in operation.Files.Select(f => Path.GetDirectoryName(f.Path)).Distinct())
+                DeleteFolder(folder);
         }
     }
 
-    private void DeleteFile(string? path)
+    private void DeleteFolder(string? folder)
     {
-        if (string.IsNullOrEmpty(path)) return;
+        if (string.IsNullOrEmpty(folder)) return;
         try
         {
-            // A package lives alone in its own workspace folder
-            var folder = Path.GetDirectoryName(path);
-            if (folder != null && Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+            // A package's zips live alone in their own workspace folder
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not delete expired package {Path}", path);
+            _logger.LogWarning(ex, "Could not delete expired package folder {Folder}", folder);
         }
     }
 }

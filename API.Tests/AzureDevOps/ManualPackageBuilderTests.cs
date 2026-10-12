@@ -170,72 +170,68 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
-    public void CombinedPackage_NestsBothKitsAndARootOrchestrator()
+    public void TierZip_HoldsTheKitAtItsRoot()
     {
-        var api = NewDirectory("api-kit", "Deploy.ps1", "deploy-config.json", Path.Combine("app", "API.dll"));
-        var frontend = NewDirectory("frontend-kit", "Deploy.ps1", Path.Combine("app", "index.html"));
-        var zipPath = Path.Combine(_root, "combined.zip");
-
-        ManualPackageBuilder.BuildCombined(
-            zipPath, api, frontend, "combined readme", ManualPackageBuilder.BuildCombinedDeployScript());
-
-        using var archive = ZipFile.OpenRead(zipPath);
-        var names = archive.Entries.Select(e => e.FullName).ToList();
-        Assert.Contains("api/Deploy.ps1", names);
-        Assert.Contains("api/app/API.dll", names);
-        Assert.Contains("frontend/Deploy.ps1", names);
-        Assert.Contains("frontend/app/index.html", names);
-        Assert.Contains("Deploy.ps1", names);
-        Assert.Contains("README.txt", names);
-
-        var rootScript = new StreamReader(archive.Entries.Single(e => e.FullName == "Deploy.ps1").Open()).ReadToEnd();
-        Assert.Contains("Invoke-Kit 'api'", rootScript);
-        Assert.Contains("Invoke-Kit 'frontend'", rootScript);
-    }
-
-    [Fact]
-    public void ThreeTierPackage_AddsTheDatabaseKitAndRunsItFirst()
-    {
-        var database = NewDirectory("database-kit", "Deploy.ps1", "deploy-config.json",
+        var database = NewDirectory("database-kit", "Deploy.ps1", "deploy-config.json", "Deploy-AllTiers.ps1",
             Path.Combine("dbmigrator", "DbMigrator.exe"), Path.Combine("sqlscripts", "SQLPatch_New", "1.sql"),
             Path.Combine("backup", "AuditVareSchema.bak"));
-        var api = NewDirectory("api-kit", "Deploy.ps1", "deploy-config.json", Path.Combine("app", "API.dll"));
-        var frontend = NewDirectory("frontend-kit", "Deploy.ps1", Path.Combine("app", "index.html"));
-        var zipPath = Path.Combine(_root, "three-tier.zip");
+        var zipPath = Path.Combine(_root, "AuditVare_database-1.0.1_manual-deploy.zip");
 
-        ManualPackageBuilder.BuildCombined(
-            zipPath, api, frontend, "readme", ManualPackageBuilder.BuildCombinedDeployScript(), database);
+        ManualPackageBuilder.ZipDirectory(database, zipPath);
 
         using var archive = ZipFile.OpenRead(zipPath);
         var names = archive.Entries.Select(e => e.FullName).ToList();
-        Assert.Contains("database/Deploy.ps1", names);
-        Assert.Contains("database/dbmigrator/DbMigrator.exe", names);
-        Assert.Contains("database/sqlscripts/SQLPatch_New/1.sql", names);
-        Assert.Contains("database/backup/AuditVareSchema.bak", names);
-        Assert.Contains("api/app/API.dll", names);
-        Assert.Contains("frontend/app/index.html", names);
-
-        // database, then API, then frontend - and the database settings asked once go to both
-        var root = new StreamReader(archive.Entries.Single(e => e.FullName == "Deploy.ps1").Open()).ReadToEnd();
-        var databaseAt = root.IndexOf("Invoke-Kit 'database'", StringComparison.Ordinal);
-        var apiAt = root.IndexOf("Invoke-Kit 'api'", StringComparison.Ordinal);
-        var frontendAt = root.IndexOf("Invoke-Kit 'frontend'", StringComparison.Ordinal);
-        Assert.True(databaseAt >= 0 && databaseAt < apiAt && apiAt < frontendAt, "kits must run database, api, frontend");
-        Assert.Contains("'-DatabaseName'", root);
-        Assert.Contains("UseDefaults", root);
+        Assert.Contains("Deploy.ps1", names);
+        Assert.Contains("deploy-config.json", names);
+        Assert.Contains("Deploy-AllTiers.ps1", names);
+        Assert.Contains("dbmigrator/DbMigrator.exe", names);
+        Assert.Contains("sqlscripts/SQLPatch_New/1.sql", names);
+        Assert.Contains("backup/AuditVareSchema.bak", names);
     }
 
     [Fact]
-    public void ThreeTierReadme_ExplainsOneServerAndSeparateServers()
+    public void AllTiersScript_JoinsOnlyKitsOfTheSameDownload_AndRunsDatabaseApiFrontend()
     {
-        var readme = ManualPackageBuilder.BuildCombinedReadme(
-            "AuditVare", "Dev API", "1.0.0456", "Dev Web", "20261011.2",
-            hasDatabaseKit: true, freshDatabase: true, databaseName: "AuditVareBOP");
+        var script = ManualPackageBuilder.BuildAllTiersScript();
 
-        Assert.Contains("database\\", readme);
-        Assert.Contains("AuditVareBOP", readme);
-        Assert.Contains("database\\ first, then api\\, then frontend\\", readme);
-        Assert.Contains("-UseDefaults", readme);
+        Assert.Contains("packageSetId", script);
+        Assert.Contains("Expand-Archive", script);
+        Assert.Contains("separateDatabase", script);
+        var databaseAt = script.IndexOf("Invoke-Kit 'Database'", StringComparison.Ordinal);
+        var apiAt = script.IndexOf("Invoke-Kit 'Api'", StringComparison.Ordinal);
+        var frontendAt = script.IndexOf("Invoke-Kit 'Frontend'", StringComparison.Ordinal);
+        Assert.True(databaseAt >= 0 && databaseAt < apiAt && apiAt < frontendAt, "kits must run database, api, frontend");
+        // the database settings asked once go to both the database and API kits
+        Assert.Contains("'-DatabaseName'", script);
+        Assert.Contains("($shared + $dbArgs)", script);
+        Assert.Contains("UseDefaults", script);
+        Assert.Contains("InstallersPath", script);
+    }
+
+    [Fact]
+    public void TierSetReadme_ExplainsSeparateServersAndOneMachine()
+    {
+        var three = ManualPackageBuilder.BuildTierSetReadme(threeTier: true);
+        var two = ManualPackageBuilder.BuildTierSetReadme(threeTier: false);
+
+        Assert.Contains("database first, then API, then frontend", three);
+        Assert.Contains("Deploy-AllTiers.ps1", three);
+        Assert.Contains("also sets up the database", two);
+        Assert.Contains("Deploy-AllTiers.ps1", two);
+    }
+
+    [Fact]
+    public void TierZip_ReportsProgressUpToTheFullSize()
+    {
+        var api = NewDirectory("api-kit2", "Deploy.ps1", Path.Combine("app", "API.dll"), Path.Combine("app", "web.config"));
+        var expectedTotal = Directory.EnumerateFiles(api, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
+        var reports = new List<(long Done, long Total)>();
+
+        ManualPackageBuilder.ZipDirectory(api, Path.Combine(_root, "progress.zip"), (done, total) => reports.Add((done, total)));
+
+        Assert.NotEmpty(reports);
+        Assert.All(reports, r => Assert.Equal(expectedTotal, r.Total));
+        Assert.Equal(expectedTotal, reports[^1].Done);
     }
 
     [Fact]
@@ -248,25 +244,6 @@ public class ManualPackageBuilderTests : IDisposable
         Assert.Contains("serverType -eq 'Database'", script);
         Assert.Contains("function Test-RunsDatabase", script);
         Assert.Contains("separateDatabase", script);
-    }
-
-    [Fact]
-    public void ThreeTierZip_ReportsProgressUpToTheFullSize()
-    {
-        var database = NewDirectory("db-kit", "Deploy.ps1", Path.Combine("dbmigrator", "DbMigrator.exe"));
-        var api = NewDirectory("api-kit2", "Deploy.ps1", Path.Combine("app", "API.dll"), Path.Combine("app", "web.config"));
-        var frontend = NewDirectory("web-kit2", "Deploy.ps1", Path.Combine("app", "index.html"));
-        var expectedTotal = new[] { database, api, frontend }
-            .SelectMany(d => Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories))
-            .Sum(f => new FileInfo(f).Length);
-        var reports = new List<(long Done, long Total)>();
-
-        ManualPackageBuilder.BuildCombined(Path.Combine(_root, "progress.zip"), api, frontend, "readme",
-            ManualPackageBuilder.BuildCombinedDeployScript(), database, (done, total) => reports.Add((done, total)));
-
-        Assert.NotEmpty(reports);
-        Assert.All(reports, r => Assert.Equal(expectedTotal, r.Total));
-        Assert.Equal(expectedTotal, reports[^1].Done);
     }
 
     [Fact]
@@ -283,11 +260,12 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
-    public void CombinedFileName_IncludesBothBuilds()
+    public void TierFileName_NamesTheTierAndBuild()
     {
-        Assert.Equal(
-            "AuditVare_api-1.0.0277_frontend-1.0.0278_manual-deploy.zip",
-            ManualPackageBuilder.BuildCombinedFileName("AuditVare", "1.0.0277", "1.0.0278"));
+        Assert.Equal("AuditVare_database-1.0.0277_manual-deploy.zip",
+            ManualPackageBuilder.BuildTierFileName("AuditVare", "database", "1.0.0277"));
+        Assert.Equal("AuditVare_frontend-20261011.2_manual-deploy.zip",
+            ManualPackageBuilder.BuildTierFileName("AuditVare", "frontend", "20261011.2"));
     }
 
     public void Dispose()

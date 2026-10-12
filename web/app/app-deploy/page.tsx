@@ -180,7 +180,9 @@ export default function AppDeployPage() {
   const [packageInstallers, setPackageInstallers] = useState<InstallerFile[] | null>(null);
   const [downloadingPackage, setDownloadingPackage] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
-  const [packageKind, setPackageKind] = useState<'single' | 'combined'>('single');
+  // single: one zip for this server. twoTier: API (+ database) and frontend zips. threeTier: database, API and frontend zips.
+  const [packageKind, setPackageKind] = useState<'single' | 'twoTier' | 'threeTier'>('single');
+  const isTiered = packageKind !== 'single';
   const [freshDatabase, setFreshDatabase] = useState(false);
   const [certificateMode, setCertificateMode] = useState<'Default' | 'UserProvided'>('Default');
   const [siteHostName, setSiteHostName] = useState('');
@@ -526,9 +528,9 @@ export default function AppDeployPage() {
       alert('Enter the HTTPS host name for this server (the Site URL from Server Setup).');
       return;
     }
-    if (packageKind === 'combined') {
+    if (isTiered) {
       if (!counterpartServerId) {
-        alert('A three-tier package needs both an API server and a frontend server on this application.');
+        alert(`A ${packageKind === 'twoTier' ? 'two' : 'three'}-tier package needs both an API server and a frontend server on this application.`);
         return;
       }
       if (!counterpartSiteHostName.trim()) {
@@ -565,34 +567,45 @@ export default function AppDeployPage() {
         artifactName: selectedArtifact,
         licensingMode,
         licenseId: licensingMode === 'WithLicense' ? licenseId : undefined,
-        freshDatabase: (packageKind === 'combined' || selectedServer.serverType === 'Api') && freshDatabase,
+        freshDatabase: (isTiered || selectedServer.serverType === 'Api') && freshDatabase,
         certificateMode,
         siteHostName: siteHostName.trim(),
         certificateFile: certificateMode === 'UserProvided' ? certificateFile : null,
-        combined: packageKind === 'combined',
-        counterpartServerId: packageKind === 'combined' ? counterpartServerId : undefined,
-        counterpartSiteHostName: packageKind === 'combined' ? counterpartSiteHostName.trim() : undefined,
+        layout: packageKind === 'twoTier' ? 'TwoTier' : packageKind === 'threeTier' ? 'ThreeTier' : 'ThisServer',
+        counterpartServerId: isTiered ? counterpartServerId : undefined,
+        counterpartSiteHostName: isTiered ? counterpartSiteHostName.trim() : undefined,
         progressId: packageProgressId,
         includeInstallers,
       });
 
       // Built in the background; then a plain link downloads it straight to disk (resumable, not held in memory)
       const operation = await waitForOperation(packageProgressId, 1500);
-      if (operation.status === 'Failed' || !operation.downloadToken) throw new Error(operation.error || 'Failed to build the package');
-      const url = api.operationDownloadUrl(packageProgressId, operation.downloadToken);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = operation.fileName ?? 'manual-deploy.zip';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const token = operation.downloadToken;
+      if (operation.status === 'Failed' || !token) throw new Error(operation.error || 'Failed to build the package');
+      // One zip per tier for two- and three-tier packages; each goes straight to disk through its own link
+      const packageFiles = operation.files?.length
+        ? operation.files
+        : [{ index: 0, fileName: operation.fileName ?? 'manual-deploy.zip', sizeBytes: operation.fileSizeBytes ?? 0 }];
       setPackageDialogOpen(false);
-      const size = operation.fileSizeBytes ? ` (${formatFileSize(operation.fileSizeBytes)})` : '';
-      toast.success(`Downloading ${operation.fileName}${size}`, {
-        description: 'Your browser saves it directly; the link stays valid for 2 hours.',
-        duration: 15000,
-        action: { label: 'Download again', onClick: () => window.open(url, '_blank') },
-      });
+      for (const file of packageFiles) {
+        const url = api.operationDownloadUrl(packageProgressId, token, file.index);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        const size = file.sizeBytes ? ` (${formatFileSize(file.sizeBytes)})` : '';
+        toast.success(`Downloading ${file.fileName}${size}`, {
+          description: packageFiles.length > 1
+            ? 'One zip per server. If your browser asks, allow multiple downloads. Links stay valid for 2 hours.'
+            : 'Your browser saves it directly; the link stays valid for 2 hours.',
+          duration: 20000,
+          action: { label: 'Download again', onClick: () => window.open(url, '_blank') },
+        });
+        // Browsers drop downloads started in the same instant
+        if (packageFiles.length > 1) await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
     } catch (err) {
       const data = (err as { response?: { data?: unknown } }).response?.data;
       let message = (err as RequestError).message ?? 'Failed to build the package';
@@ -612,8 +625,10 @@ export default function AppDeployPage() {
   };
 
   // Installers a package of the chosen kind would carry (the database kit has its own Hosting Bundle)
-  const packageInstallerComponents: string[] = packageKind === 'combined'
+  const packageInstallerComponents: string[] = packageKind === 'threeTier'
     ? ['HostingBundle', 'DotNetSdk', 'Redis', 'UrlRewrite', 'HostingBundle', ...(freshDatabase ? ['SqlServer'] : [])]
+    : packageKind === 'twoTier'
+    ? ['HostingBundle', 'DotNetSdk', 'Redis', 'UrlRewrite', ...(freshDatabase ? ['SqlServer'] : [])]
     : selectedServer?.serverType === 'Frontend'
       ? ['UrlRewrite']
       : ['HostingBundle', 'DotNetSdk', 'Redis', ...(freshDatabase ? ['SqlServer'] : [])];
@@ -1428,9 +1443,11 @@ export default function AppDeployPage() {
             <DialogDescription>
               {downloadingPackage
                 ? 'Preparing your deployment package. Please wait...'
-                : packageKind === 'combined'
-                ? 'One zip with a database, an API and a frontend kit. On one server, run the root Deploy.ps1: it deploys the database, then the API, then the frontend. For separate servers, copy each kit to its own server and run its Deploy.ps1. Every script asks for the IIS and database names (Enter keeps the default). The servers do not need internet.'
-                : `This package will prepare the server, configure IIS, deploy the application${selectedServer?.serverType === 'Api' ? ', configure the database, run DbMigrator' : ''}, and configure HTTPS. The client server does not need internet.`}
+                : packageKind === 'threeTier'
+                ? 'Three zips: database, API and frontend. Copy each to its own server and run its Deploy.ps1 (database first). For one server, put the zips in one folder, extract one and run Deploy-AllTiers.ps1. Every script asks for the IIS and database names (Enter keeps the default).'
+                : packageKind === 'twoTier'
+                ? 'Two zips: API + database, and frontend. Copy each to its own server and run its Deploy.ps1 (API first). For one server, put both zips in one folder, extract one and run Deploy-AllTiers.ps1. Every script asks for the IIS and database names (Enter keeps the default).'
+                : `This package will prepare the server, configure IIS, deploy the application${selectedServer?.serverType === 'Api' ? ', configure the database, run DbMigrator' : ''}, and configure HTTPS.${includeInstallers ? ' The client server does not need internet.' : ''}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -1458,16 +1475,33 @@ export default function AppDeployPage() {
                 <input
                   type="radio"
                   className="mt-1 accent-primary"
-                  checked={packageKind === 'combined'}
-                  onChange={() => setPackageKind('combined')}
+                  checked={packageKind === 'twoTier'}
+                  onChange={() => setPackageKind('twoTier')}
                   disabled={downloadingPackage || counterpartServers.length === 0}
                 />
                 <span>
-                  <span className="font-medium">Three-tier: database + API + frontend</span>
+                  <span className="font-medium">Two-tier: API + database, frontend</span>
                   <span className="block text-xs text-muted-foreground">
                     {counterpartServers.length === 0
-                      ? 'Add the other server on this application to enable a three-tier zip. This server only still works.'
-                      : 'Three kits in one download: database\\, api\\ and frontend\\. Run them on separate servers, or all on one server with the root Deploy.ps1.'}
+                      ? 'Add the other server on this application to enable tiered packages. This server only still works.'
+                      : 'Two zips: one for the API server (it also sets up the database there) and one for the frontend server.'}
+                  </span>
+                </span>
+              </label>
+              <label className={`flex items-start gap-2 rounded-lg border p-3 ${counterpartServers.length === 0 ? 'border-border/70 opacity-70' : 'border-border'}`}>
+                <input
+                  type="radio"
+                  className="mt-1 accent-primary"
+                  checked={packageKind === 'threeTier'}
+                  onChange={() => setPackageKind('threeTier')}
+                  disabled={downloadingPackage || counterpartServers.length === 0}
+                />
+                <span>
+                  <span className="font-medium">Three-tier: database, API, frontend</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {counterpartServers.length === 0
+                      ? 'Add the other server on this application to enable tiered packages. This server only still works.'
+                      : 'Three zips, one per server: database, API and frontend.'}
                   </span>
                 </span>
               </label>
@@ -1475,9 +1509,9 @@ export default function AppDeployPage() {
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1">
               <p><span className="text-muted-foreground">Client:</span> {clients.find((c) => c.id === selectedClientId)?.name ?? '—'}</p>
-              {packageKind === 'combined' && counterpartServer ? (
+              {isTiered && counterpartServer ? (
                 <>
-                  <p><span className="text-muted-foreground">Database:</span> {freshDatabase ? 'Fresh (baseline restore)' : 'Existing'}, then DbMigrator</p>
+                  <p><span className="text-muted-foreground">Database:</span> {freshDatabase ? 'Fresh (baseline restore)' : 'Existing'}, then DbMigrator{packageKind === 'twoTier' ? ' (on the API server)' : ' (own zip)'}</p>
                   <p><span className="text-muted-foreground">API:</span> {(selectedServer?.serverType === 'Api' ? selectedServer : counterpartServer).serverName}</p>
                   <p><span className="text-muted-foreground">Frontend:</span> {(selectedServer?.serverType === 'Frontend' ? selectedServer : counterpartServer).serverName}</p>
                 </>
@@ -1491,7 +1525,7 @@ export default function AppDeployPage() {
               )}
             </div>
 
-            {packageKind === 'combined' && counterpartServers.length > 1 && (
+            {isTiered && counterpartServers.length > 1 && (
               <div className="space-y-1.5">
                 <Label htmlFor="counterpartServer">Other server</Label>
                 <Select
@@ -1511,7 +1545,7 @@ export default function AppDeployPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="packageHost">
-                {packageKind === 'combined'
+                {isTiered
                   ? `${selectedServer?.serverType === 'Frontend' ? 'Frontend' : 'API'} host name *`
                   : 'HTTPS host name *'}
               </Label>
@@ -1524,7 +1558,7 @@ export default function AppDeployPage() {
               />
             </div>
 
-            {packageKind === 'combined' && (
+            {isTiered && (
               <div className="space-y-1.5">
                 <Label htmlFor="counterpartHost">
                   {selectedServer?.serverType === 'Frontend' ? 'API host name *' : 'Frontend host name *'}
@@ -1539,7 +1573,7 @@ export default function AppDeployPage() {
               </div>
             )}
 
-            {(packageKind === 'combined' || selectedServer?.serverType === 'Api') && (
+            {(isTiered || selectedServer?.serverType === 'Api') && (
               <div className="space-y-2">
                 <Label>Database</Label>
                 <label className="flex items-start gap-2">
@@ -1586,7 +1620,7 @@ export default function AppDeployPage() {
                 <span className="block text-xs text-muted-foreground">
                   {includeInstallers
                     ? `${packageInstallerNames}. Installed on the server only when missing. Untick for a much smaller package when the server already has them.`
-                    : `Not included: the server must already have ${packageInstallerNames}. Deploy.ps1 stops with a clear message if one is missing.`}
+                    : `Not included. Anything missing (${packageInstallerNames}) is installed from C:\\DeployVare\\Installers if the server has it, otherwise Deploy.ps1 downloads it from the official source (the server needs internet then).`}
                 </span>
               </span>
             </label>
@@ -1604,7 +1638,7 @@ export default function AppDeployPage() {
                 <span>
                   <span className="font-medium">Use existing / default certificate</span>
                   <span className="block text-xs text-muted-foreground">
-                    {packageKind === 'combined'
+                    {isTiered
                       ? 'WMSVC-SHA2 or another cert already in LocalMachine\\My, used for both sites.'
                       : 'WMSVC-SHA2 or another cert already in LocalMachine\\My.'}
                   </span>
@@ -1621,7 +1655,7 @@ export default function AppDeployPage() {
                 <span>
                   <span className="font-medium">Use my own certificate</span>
                   <span className="block text-xs text-muted-foreground">
-                    {packageKind === 'combined'
+                    {isTiered
                       ? 'One .pfx is packed in and used for both sites. The password is entered on the server.'
                       : 'The .pfx is packed in. The password is entered on the server, not stored here.'}
                   </span>
@@ -1643,14 +1677,14 @@ export default function AppDeployPage() {
             <Button type="button" variant="outline" onClick={() => setPackageDialogOpen(false)} disabled={downloadingPackage}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleDownloadPackage} disabled={downloadingPackage || (packageKind === 'combined' && !counterpartServerId)}>
+            <Button type="button" onClick={handleDownloadPackage} disabled={downloadingPackage || (isTiered && !counterpartServerId)}>
               {downloadingPackage ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Building package...
                 </>
-              ) : packageKind === 'combined' ? (
-                'Generate combined package'
+              ) : isTiered ? (
+                `Generate ${packageKind === 'twoTier' ? 'two' : 'three'} zips`
               ) : (
                 'Generate package'
               )}

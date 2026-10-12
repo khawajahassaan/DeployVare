@@ -38,8 +38,14 @@ public class ManualDeployConfig
     public string? LicenseFileName { get; set; }
     public bool HasScripts { get; set; }
 
-    /// <summary>False when the package was built without installers: missing prerequisites must be installed by hand.</summary>
+    /// <summary>False when the package was built without installers: missing prerequisites are taken from the server or downloaded.</summary>
     public bool IncludesInstallers { get; set; } = true;
+
+    /// <summary>Download URLs for missing prerequisites (ServerSetup:InstallerDownloadUrls); empty uses the official sources.</summary>
+    public Dictionary<string, string> DownloadUrls { get; set; } = new();
+
+    /// <summary>Same value in every kit of one two- or three-tier download, so Deploy-AllTiers.ps1 only joins matching kits.</summary>
+    public string? PackageSetId { get; set; }
     public List<string> ContentFolders { get; set; } = new();
     public int RequiredDotNetMajor { get; set; } = 10;
     public int MinimumSdkMajor { get; set; } = 8;

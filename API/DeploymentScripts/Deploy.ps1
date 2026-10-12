@@ -5,7 +5,8 @@
 # each with Enter or type a new one. -UseDefaults takes the packaged values without asking. The three-tier
 # root Deploy.ps1 passes -DatabaseName / -SqlDataSource / -SqlInstanceName so the database and API kits match.
 # A missing prerequisite is installed from the package's installers folder, then from -InstallersPath, then from
-# C:\DeployVare\Installers (where the DeployVare server keeps them), so a package without installers still works there.
+# C:\DeployVare\Installers (where the DeployVare server keeps them). When none of them has it, the installer is downloaded
+# from its official source (signature checked) into C:\DeployVare\Installers, so a package without installers still deploys.
 param(
     [switch]$UseDefaults,
     [string]$DatabaseName,
@@ -148,11 +149,101 @@ function Installer-Path([string]$Pattern) {
 # "Include installers" unticked says so, so the fix (install it, or re-download with installers) is clear.
 function Missing-Installer([object]$Cfg, [string]$What, [string]$Usual) {
     if ($Cfg.includesInstallers -eq $false) {
-        return "$What is not installed on this server, and this package was built without installers. " +
+        return "$What is not installed on this server, this package was built without installers and the download did not work. " +
                "Install $What first, run .\Deploy.ps1 -InstallersPath <folder with the installers>, " +
                "or download the package again with 'Include installers' ticked."
     }
     return $Usual
+}
+
+# Official download sources, used only when no installers folder has the file. deploy-config.json "downloadUrls"
+# (set in DeployVare under ServerSetup:InstallerDownloadUrls) overrides any of them. .NET comes from Microsoft's
+# release list and is checked against its published SHA-512; every download must carry a valid Authenticode signature.
+$DownloadSources = @{
+    UrlRewrite = @{ Url = 'https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi'; Name = 'rewrite_amd64_en-US.msi'; Microsoft = $true }
+    SqlServer  = @{ Url = 'https://go.microsoft.com/fwlink/p/?linkid=2216019'; Name = 'SQL2025-SSEI-Expr.exe'; Microsoft = $true }
+    Memurai    = @{ Url = $null; Name = 'Memurai-for-Redis.msi'; Microsoft = $false }
+}
+
+function Get-DownloadFolder {
+    $dir = 'C:\DeployVare\Installers'
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $full = [IO.Path]::GetFullPath($dir).TrimEnd('\') + '\'
+    if ($script:InstallerDirs -notcontains $full) { $script:InstallerDirs = @($script:InstallerDirs) + $full }
+    return $dir
+}
+
+function Get-DotNetReleaseFile([int]$Major, [string]$Section, [string]$FileName) {
+    $last = $null
+    foreach ($base in 'https://builds.dotnet.microsoft.com', 'https://dotnetcli.blob.core.windows.net') {
+        try {
+            $meta = Invoke-RestMethod -UseBasicParsing -TimeoutSec 60 -Uri "$base/dotnet/release-metadata/$Major.0/releases.json"
+            $release = $meta.releases | Where-Object { $_.'release-version' -eq $meta.'latest-release' } | Select-Object -First 1
+            if (-not $release) { $release = $meta.releases | Select-Object -First 1 }
+            $file = $release.$Section.files | Where-Object { $_.name -eq $FileName } | Select-Object -First 1
+            if ($file) { return $file }
+            throw "$FileName is not in the .NET $Major release list."
+        } catch { $last = $_ }
+    }
+    throw "Could not read the .NET $Major release list: $($last.Exception.Message)"
+}
+
+# Downloads the installer for a missing prerequisite and returns its path, or $null (with the reason) when it cannot.
+function Download-Installer([object]$Cfg, [string]$Component) {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $override = if ($Cfg.downloadUrls) { [string]$Cfg.downloadUrls.$Component } else { '' }
+        $url = $null; $name = $null; $sha512 = $null; $microsoft = $true
+        if ($override) {
+            $url = $override
+            $microsoft = $Component -ne 'Memurai'
+        } elseif ($Component -eq 'HostingBundle' -or $Component -eq 'DotNetSdk') {
+            $major = [int]$Cfg.requiredDotNetMajor
+            $file = if ($Component -eq 'HostingBundle') { Get-DotNetReleaseFile $major 'aspnetcore-runtime' 'dotnet-hosting-win.exe' }
+                    else { Get-DotNetReleaseFile $major 'sdk' 'dotnet-sdk-win-x64.exe' }
+            $url = [string]$file.url; $sha512 = [string]$file.hash
+        } else {
+            $source = $DownloadSources[$Component]
+            if (-not $source -or -not $source.Url) { return $null }
+            $url = $source.Url; $name = $source.Name; $microsoft = $source.Microsoft
+        }
+        $fromUrl = [IO.Path]::GetFileName(([Uri]$url).AbsolutePath)
+        if ($fromUrl -match '(?i)\.(exe|msi)$') { $name = $fromUrl }
+        if (-not $name) { $name = $DownloadSources[$Component].Name }
+        if (-not $name) { throw "Cannot tell the file name from $url" }
+
+        $folder = Get-DownloadFolder
+        $target = Join-Path $folder $name
+        $partial = $target + '.download'
+        Write-Step "No installer for $Component was found. Downloading $name from $(([Uri]$url).Host)..."
+        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $partial -TimeoutSec 1800
+        if ($sha512) {
+            $actual = (Get-FileHash -LiteralPath $partial -Algorithm SHA512).Hash
+            if ($actual -ne $sha512) { Remove-Item -LiteralPath $partial -Force; throw "$name failed its SHA-512 check." }
+        }
+        # Authenticode reads the file type from the extension, so check it under its real name
+        Move-Item -LiteralPath $partial -Destination $target -Force
+        $signature = Get-AuthenticodeSignature -LiteralPath $target
+        $signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { '' }
+        if ($signature.Status -ne 'Valid' -or ($microsoft -and $signer -notmatch 'O=Microsoft Corporation')) {
+            Remove-Item -LiteralPath $target -Force
+            throw "$name does not carry a valid $(if ($microsoft) { 'Microsoft ' })signature ($($signature.Status)); it was deleted."
+        }
+        Write-Step "[OK] Downloaded $name ($([Math]::Round((Get-Item -LiteralPath $target).Length / 1MB)) MB, signed by $(($signer -split ',')[0] -replace '^CN=',''))"
+        return $target
+    } catch {
+        Write-Step "[WARN] Could not download the $Component installer: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+# Memurai has no public direct download, so without a configured URL it is installed through winget when available.
+function Install-MemuraiWithWinget {
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if (-not $winget) { return $false }
+    Write-Step 'Installing Memurai through winget (Memurai.MemuraiDeveloper)...'
+    & $winget.Source install --id Memurai.MemuraiDeveloper --exact --silent --accept-package-agreements --accept-source-agreements | Out-Host
+    return ($LASTEXITCODE -eq 0) -and ((Test-Path (Join-Path $env:ProgramFiles 'Memurai\memurai.exe')) -or (Get-Service -Name Memurai -ErrorAction SilentlyContinue))
 }
 
 function Invoke-KnownInstaller([string]$File, [int]$TimeoutMinutes) {
@@ -218,6 +309,7 @@ function Ensure-DotNetRuntime([object]$Cfg) {
         return
     }
     $file = Installer-Path 'dotnet-hosting-*-win.exe'
+    if (-not $file) { $file = Download-Installer $Cfg 'HostingBundle' }
     if (-not $file) { Fail (Missing-Installer $Cfg ".NET $major (Hosting Bundle or runtime)" ".NET $major runtime is missing and no Hosting Bundle installer is in the package installers folder.") }
     Write-Step "Installing .NET $major runtime via the Hosting Bundle ($([IO.Path]::GetFileName($file)))..."
     Invoke-KnownInstaller $file 30
@@ -243,6 +335,7 @@ function Ensure-DotNet([object]$Cfg) {
     $hasRuntime = $runtimes | Where-Object { ($_ -split '\.')[0] -eq "$major" }
     if (-not $hasRuntime -or -not $moduleOk) {
         $file = Installer-Path 'dotnet-hosting-*-win.exe'
+        if (-not $file) { $file = Download-Installer $Cfg 'HostingBundle' }
         if (-not $file) { Fail (Missing-Installer $Cfg "the .NET $major Hosting Bundle" ".NET $major Hosting Bundle is missing and no installer is in the package installers folder.") }
         Write-Step "Installing .NET $major Hosting Bundle ($([IO.Path]::GetFileName($file)))..."
         Invoke-KnownInstaller $file 30
@@ -257,9 +350,10 @@ function Ensure-DotNet([object]$Cfg) {
     $sdkOk = $sdks | Where-Object { [int](($_ -split '\.')[0]) -ge $minSdk }
     if (-not $sdkOk) {
         $file = Installer-Path 'dotnet-sdk-*-win-x64.exe'
+        if (-not $file) { $file = Download-Installer $Cfg 'DotNetSdk' }
         if (-not $file) {
             # The API runs on the Hosting Bundle; the SDK only helps with tooling, so its absence does not stop the deploy
-            Write-Step "[WARN] No .NET SDK $minSdk or newer is installed and no SDK installer was found. Continuing without it."
+            Write-Step "[WARN] No .NET SDK $minSdk or newer is installed and it could not be downloaded. Continuing without it."
             return
         }
         Write-Step "Installing .NET SDK ($([IO.Path]::GetFileName($file)))..."
@@ -282,6 +376,7 @@ function Ensure-UrlRewrite([object]$Cfg) {
         return
     }
     $file = Installer-Path 'rewrite_amd64*.msi'
+    if (-not $file) { $file = Download-Installer $Cfg 'UrlRewrite' }
     if (-not $file) { Fail (Missing-Installer $Cfg 'IIS URL Rewrite' 'IIS URL Rewrite is not installed and rewrite_amd64*.msi is not in the package installers folder.') }
     Write-Step "Installing IIS URL Rewrite ($([IO.Path]::GetFileName($file)))..."
     Invoke-KnownInstaller $file 15
@@ -333,6 +428,16 @@ function Ensure-Memurai([object]$Cfg) {
     }
     $file = Installer-Path 'Memurai*.msi'
     if (-not $file) { $file = Installer-Path 'Redis-x64-*.msi' }
+    if (-not $file) { $file = Download-Installer $Cfg 'Memurai' }
+    if (-not $file -and (Install-MemuraiWithWinget)) {
+        $svc = Get-PreferredRedisService
+        if ($svc) {
+            Set-Service -Name $svc.Name -StartupType Automatic
+            if ($svc.Status -ne 'Running') { Start-Service -Name $svc.Name }
+        }
+        Write-Step "[OK] Memurai installed through winget (port $port)"
+        return
+    }
     if (-not $file) { Fail (Missing-Installer $Cfg 'Memurai (Redis)' 'Memurai / Redis is not installed and no Memurai*.msi installer is in the package.') }
     Write-Step "Installing Memurai (Redis $($Cfg.requiredRedisMajor) on port $port) ($([IO.Path]::GetFileName($file)))..."
     Stop-ListenersOnRedisPort $port
@@ -492,6 +597,7 @@ function Ensure-SqlServer([object]$Cfg) {
     }
     $file = Installer-Path 'SQLEXPR_x64*.exe'
     if (-not $file) { $file = Installer-Path 'SQL*SSEI*Expr*.exe' }
+    if (-not $file) { $file = Download-Installer $Cfg 'SqlServer' }
     if (-not $file) {
         Fail (Missing-Installer $Cfg 'SQL Server' "SQL Server is not installed. Put SQL2025-SSEI-Expr.exe or SQLEXPR_x64_ENU.exe in the package installers folder.")
     }

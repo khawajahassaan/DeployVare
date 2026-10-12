@@ -38,4 +38,11 @@ public class ServerSetupOptions
         // SQL Express: the small SSEI bootstrapper (SQL2025-SSEI-Expr.exe) or the full offline SQLEXPR_x64_ENU.exe.
         ["SqlServer"] = "SQL*SSEI*Expr*.exe;SQLEXPR_x64*.exe"
     };
+
+    /// <summary>
+    /// Optional download URLs written into manual packages (keys HostingBundle, DotNetSdk, UrlRewrite, Memurai,
+    /// SqlServer). Deploy.ps1 downloads a missing prerequisite from here when no installers folder has it; without an
+    /// entry it uses the official source (Memurai has none, so set its URL here or the server needs winget).
+    /// </summary>
+    public Dictionary<string, string> InstallerDownloadUrls { get; set; } = new();
 }

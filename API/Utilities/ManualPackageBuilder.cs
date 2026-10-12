@@ -159,7 +159,7 @@ public static class ManualPackageBuilder
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
         text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
         text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
-        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - " + (config.ServerType == "Frontend" ? "IIS and IIS URL Rewrite" : "IIS, the .NET Hosting Bundle, the .NET SDK and Memurai") + " must already be installed, or run Deploy.ps1 -InstallersPath <folder> (C:\\DeployVare\\Installers is also tried)")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - anything missing (" + (config.ServerType == "Frontend" ? "IIS URL Rewrite" : ".NET Hosting Bundle, .NET SDK, Memurai") + (config.FreshDatabase ? ", SQL Server Express" : "") + ") is installed from -InstallersPath or C:\\DeployVare\\Installers, otherwise downloaded from its official source")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");
         if (!string.IsNullOrWhiteSpace(config.LicenseFileName))
@@ -250,58 +250,47 @@ public static class ManualPackageBuilder
         return $"{safeServer}_{safeBuild}_manual-deploy.zip";
     }
 
-    public static string BuildCombinedFileName(string applicationName, string apiBuild, string frontendBuild)
-    {
-        return $"{Sanitize(applicationName)}_api-{Sanitize(apiBuild)}_frontend-{Sanitize(frontendBuild)}_manual-deploy.zip";
-    }
+    /// <summary>One zip of a two- or three-tier download, e.g. AuditVare_database-1.0.0277_manual-deploy.zip.</summary>
+    public static string BuildTierFileName(string applicationName, string tier, string buildNumber) =>
+        $"{Sanitize(applicationName)}_{Sanitize(tier)}-{Sanitize(buildNumber)}_manual-deploy.zip";
 
-    public static void BuildCombined(
-        string zipPath,
-        string apiKitDirectory,
-        string frontendKitDirectory,
-        string readme,
-        string orchestrator,
-        string? databaseKitDirectory = null,
-        Action<long, long>? onProgress = null)
+    /// <summary>Zips a finished kit folder (its files at the zip root).</summary>
+    public static void ZipDirectory(string sourceDirectory, string zipPath, Action<long, long>? onProgress = null)
     {
         var directory = Path.GetDirectoryName(zipPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-
-        var hasDatabaseKit = !string.IsNullOrWhiteSpace(databaseKitDirectory);
-        var progress = new ZipProgress(onProgress,
-            DirectorySize(apiKitDirectory) + DirectorySize(frontendKitDirectory) + (hasDatabaseKit ? DirectorySize(databaseKitDirectory!) : 0));
-
+        var progress = new ZipProgress(onProgress, DirectorySize(sourceDirectory));
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
-        if (hasDatabaseKit)
-            AddDirectory(archive, databaseKitDirectory!, DatabaseKitFolder, progress);
-        AddDirectory(archive, apiKitDirectory, ApiKitFolder, progress);
-        AddDirectory(archive, frontendKitDirectory, FrontendKitFolder, progress);
-
-        var scriptEntry = archive.CreateEntry(DeployScriptName, CompressionLevel.Optimal);
-        using (var scriptWriter = new StreamWriter(scriptEntry.Open(), new UTF8Encoding(false)))
-            scriptWriter.Write(orchestrator);
-
-        var entry = archive.CreateEntry(ReadmeName, CompressionLevel.Optimal);
-        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
-        writer.Write(readme);
+        foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, file).Replace('\\', '/');
+            archive.CreateEntryFromFile(file, relativePath, CompressionLevel.Fastest);
+            progress.Add(new FileInfo(file).Length);
+        }
     }
 
-    public static string BuildCombinedDeployScript() => """
-# DeployVare three-tier manual deployment, all tiers on THIS machine. Run as Administrator: .\Deploy.ps1
-# Runs database\Deploy.ps1, then api\Deploy.ps1, then frontend\Deploy.ps1. Each folder is a complete kit:
-# for separate database / API / frontend servers, copy one folder to each server and run its Deploy.ps1.
-# The database settings are asked once here and handed to the database and API kits so they match.
-# -UseDefaults deploys with the values the package was built with, without asking.
-# -InstallersPath <folder> is handed to every kit: missing prerequisites are installed from there when the package
-# has no installers (C:\DeployVare\Installers is also tried).
+    public const string AllTiersScriptName = "Deploy-AllTiers.ps1";
+
+    /// <summary>
+    /// Added to every zip of a two- or three-tier download. Each zip is a complete kit for its own server; this script
+    /// is only for putting every tier on ONE machine. It finds the other zips (or their extracted folders) of the same
+    /// download next to its own folder, matched by packageSetId, extracts them, and runs database, API, frontend.
+    /// </summary>
+    public static string BuildAllTiersScript() => """
+# DeployVare: every tier of this download on THIS machine. Run as Administrator: .\Deploy-AllTiers.ps1
+# Each zip of the download is a complete kit for its own server (run its Deploy.ps1 there). For one machine, put all
+# the zips of the download in one folder, extract any one of them, and run this script from it: it extracts the
+# others and runs database (three-tier), then API, then frontend. The database settings are asked once.
+# -UseDefaults deploys with the packaged values without asking. -InstallersPath <folder> is handed to every kit.
 param([switch]$UseDefaults, [string]$InstallersPath)
 $ErrorActionPreference = 'Stop'
-$PackageRoot = $PSScriptRoot
+$Here = $PSScriptRoot
+$Parent = Split-Path -Parent $Here
 
 function Assert-Admin {
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Write-Host 'Administrator privileges are required. Please run Deploy.ps1 as Administrator.'
+        Write-Host 'Administrator privileges are required. Please run Deploy-AllTiers.ps1 as Administrator.'
         exit 1
     }
 }
@@ -313,33 +302,81 @@ function Read-Setting([string]$Label, [string]$Default) {
     return $answer.Trim()
 }
 
-function Invoke-Kit([string]$Name, [string[]]$KitArgs) {
-    $dir = Join-Path $PackageRoot $Name
-    $script = Join-Path $dir 'Deploy.ps1'
-    if (-not (Test-Path -LiteralPath $script)) {
-        Write-Host "FAILED: $Name\Deploy.ps1 was not found."
-        exit 1
-    }
-    Write-Host ''
-    Write-Host "======== $Name ========"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script @KitArgs
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "FAILED: the $Name kit exited with code $LASTEXITCODE."
-        exit $LASTEXITCODE
-    }
+function Read-KitConfig([string]$Dir) {
+    $path = Join-Path $Dir 'deploy-config.json'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    try { return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
 }
 
 Assert-Admin
+$own = Read-KitConfig $Here
+if (-not $own -or -not $own.packageSetId) {
+    Write-Host 'FAILED: deploy-config.json next to this script has no packageSetId (not a two- or three-tier download).'
+    exit 1
+}
+$setId = [string]$own.packageSetId
+$kits = @{}
+function Add-Kit([string]$Dir) {
+    $cfg = Read-KitConfig $Dir
+    if ($cfg -and [string]$cfg.packageSetId -eq $setId -and -not $kits.ContainsKey([string]$cfg.serverType)) {
+        $kits[[string]$cfg.serverType] = @{ Dir = $Dir; Cfg = $cfg }
+    }
+}
+
+Add-Kit $Here
+Get-ChildItem -LiteralPath $Parent -Directory -ErrorAction SilentlyContinue | ForEach-Object { Add-Kit $_.FullName }
+
+# Zips of the same download that are not extracted yet
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+foreach ($zipFile in @(Get-ChildItem -LiteralPath $Parent -Filter '*.zip' -File -ErrorAction SilentlyContinue)) {
+    $cfg = $null
+    try {
+        $zip = [IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
+        try {
+            $entry = $zip.GetEntry('deploy-config.json')
+            if ($entry) {
+                $reader = New-Object IO.StreamReader($entry.Open())
+                try { $cfg = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            }
+        } finally { $zip.Dispose() }
+    } catch { continue }
+    if (-not $cfg -or [string]$cfg.packageSetId -ne $setId -or $kits.ContainsKey([string]$cfg.serverType)) { continue }
+    $dest = Join-Path $Parent ([IO.Path]::GetFileNameWithoutExtension($zipFile.Name))
+    Write-Host "Extracting $($zipFile.Name)..."
+    try { Unblock-File -LiteralPath $zipFile.FullName -ErrorAction SilentlyContinue } catch { }
+    Expand-Archive -LiteralPath $zipFile.FullName -DestinationPath $dest -Force
+    Add-Kit $dest
+}
+
+$needDatabase = $kits.ContainsKey('Api') -and [bool]$kits['Api'].Cfg.separateDatabase
+$missing = @()
+if ($needDatabase -and -not $kits.ContainsKey('Database')) { $missing += 'database' }
+if (-not $kits.ContainsKey('Api')) { $missing += 'api' }
+if (-not $kits.ContainsKey('Frontend')) { $missing += 'frontend' }
+if ($missing.Count -gt 0) {
+    Write-Host "FAILED: the $($missing -join ', ') zip(s) of this download were not found in $Parent."
+    Write-Host 'Put every zip of the download in that folder (extracted or not) and run this script again.'
+    exit 1
+}
+
+function Invoke-Kit([string]$Tier, [string[]]$KitArgs) {
+    $script = Join-Path $kits[$Tier].Dir 'Deploy.ps1'
+    Write-Host ''
+    Write-Host "======== $Tier ========"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script @KitArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAILED: the $Tier kit exited with code $LASTEXITCODE."
+        exit $LASTEXITCODE
+    }
+}
 
 $shared = @()
 if ($UseDefaults) { $shared += '-UseDefaults' }
 if ($InstallersPath) { $shared += @('-InstallersPath', $InstallersPath) }
 
 $dbArgs = @()
-$dbConfigPath = Join-Path $PackageRoot 'database\deploy-config.json'
-$hasDatabaseKit = Test-Path -LiteralPath $dbConfigPath
-if ($hasDatabaseKit) {
-    $db = Get-Content -LiteralPath $dbConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($needDatabase) {
+    $db = $kits['Database'].Cfg
     if (-not $UseDefaults) { Write-Host 'Database (press Enter to keep the value in brackets):' }
     $instance = [string]$db.sqlInstanceName
     if (-not $instance) { $instance = 'SQLEXPRESS' }
@@ -351,60 +388,41 @@ if ($hasDatabaseKit) {
     }
     $name = Read-Setting 'Database name' ([string]$db.databaseName)
     $dbArgs = @('-DatabaseName', $name, '-SqlDataSource', $source, '-SqlInstanceName', $instance)
-    Invoke-Kit 'database' ($shared + $dbArgs)
+    Invoke-Kit 'Database' ($shared + $dbArgs)
 }
 
-Invoke-Kit 'api' ($shared + $dbArgs)
-Invoke-Kit 'frontend' $shared
+Invoke-Kit 'Api' ($shared + $dbArgs)
+Invoke-Kit 'Frontend' $shared
 Write-Host ''
-Write-Host 'Three-tier deployment completed successfully (database, API and frontend on this machine).'
+Write-Host "All tiers deployed successfully on this machine ($(if ($needDatabase) { 'database, ' })API and frontend)."
 exit 0
 """;
 
-    public static string BuildCombinedReadme(
-        string applicationName,
-        string apiServerName,
-        string apiBuild,
-        string frontendServerName,
-        string frontendBuild,
-        bool hasDatabaseKit = false,
-        bool freshDatabase = false,
-        string? databaseName = null)
+    /// <summary>README section added to each zip of a two- or three-tier download.</summary>
+    public static string BuildTierSetReadme(bool threeTier)
     {
         var text = new StringBuilder();
-        text.AppendLine("DEPLOYVARE THREE-TIER MANUAL DEPLOYMENT");
+        text.AppendLine(threeTier ? "PART OF A THREE-TIER DOWNLOAD" : "PART OF A TWO-TIER DOWNLOAD");
         text.AppendLine();
-        text.AppendLine($"Application:        {applicationName}");
-        if (hasDatabaseKit)
-            text.AppendLine($"Database:           {databaseName ?? "(asked on the server)"}  ({(freshDatabase ? "Fresh Database: baseline restore" : "Existing Database")}, then DbMigrator)");
-        text.AppendLine($"API server:         {apiServerName}  (build #{apiBuild})");
-        text.AppendLine($"Frontend server:    {frontendServerName}  (build #{frontendBuild})");
+        text.AppendLine(threeTier
+            ? "This download is one zip per server: *_database-*, *_api-* and *_frontend-*.zip."
+            : "This download is one zip per server: *_api-* (API and database) and *_frontend-*.zip.");
         text.AppendLine();
-        text.AppendLine("Folders (each one is a complete kit with its own Deploy.ps1):");
-        if (hasDatabaseKit)
-            text.AppendLine("  database\\   SQL Server (installed if needed), baseline restore, DbMigrator");
-        text.AppendLine("  api\\        IIS site for the API, .NET Hosting Bundle, Memurai (Redis)");
-        text.AppendLine("  frontend\\   IIS site for the frontend, URL Rewrite");
+        text.AppendLine("Separate servers: copy each zip to its own server, extract it and run its Deploy.ps1 as");
+        text.AppendLine(threeTier
+            ? "Administrator, in this order: database first, then API, then frontend."
+            : "Administrator: the API zip first (it also sets up the database), then the frontend zip.");
+        if (threeTier)
+        {
+            text.AppendLine("With SQL Server on another machine, the API kit cannot grant its IIS app pool account");
+            text.AppendLine("(a local account) access to the database: put a SQL login in the API's appsettings.json");
+            text.AppendLine("connection string, or grant the API server's domain machine account.");
+        }
         text.AppendLine();
-        text.AppendLine("All three tiers on ONE server:");
-        text.AppendLine("  1. Copy the complete folder to the server.");
-        text.AppendLine("  2. Open PowerShell as Administrator in that folder.");
-        text.AppendLine("  3. Run:");
-        text.AppendLine();
-        text.AppendLine("       .\\Deploy.ps1");
-        text.AppendLine();
-        text.AppendLine("  It asks for the database settings once, then runs database, API and frontend in that order.");
-        text.AppendLine();
-        text.AppendLine("Separate servers (three-tier):");
-        text.AppendLine("  Copy each folder to its own server and run that folder's Deploy.ps1 as Administrator,");
-        text.AppendLine("  in this order: database\\ first, then api\\, then frontend\\.");
-        text.AppendLine("  With SQL Server on another machine, the API kit cannot grant its IIS app pool account");
-        text.AppendLine("  (a local account) access to the database: put a SQL login in the API's appsettings.json");
-        text.AppendLine("  connection string, or grant the API server's domain machine account.");
-        text.AppendLine();
-        text.AppendLine("Every Deploy.ps1 shows the names it will use (IIS site, app pool, folder, host name,");
-        text.AppendLine("SQL Server, database) and lets you keep each one with Enter or type a new value.");
-        text.AppendLine("Add -UseDefaults to deploy with the packaged values without being asked.");
+        text.AppendLine("Everything on ONE machine: put all the zips in one folder, extract any one of them, and run");
+        text.AppendLine($"  .\\{AllTiersScriptName}");
+        text.AppendLine("from it as Administrator. It extracts the other zips and deploys every tier in order,");
+        text.AppendLine("asking for the database settings once. Add -UseDefaults to keep the packaged values.");
         text.AppendLine();
         return text.ToString();
     }
@@ -419,7 +437,7 @@ exit 0
         text.AppendLine($"Database:           {config.DatabaseName}");
         text.AppendLine($"Database Mode:      {(config.FreshDatabase ? "Fresh Database (installs SQL Express if needed, restores the baseline backup)" : "Existing Database (must already exist)")}");
         text.AppendLine($"SQL scripts:        {sqlFileCount} (run by DbMigrator)");
-        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (.NET runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ")" : "Not included - the .NET 10 runtime" + (config.FreshDatabase ? " and SQL Server" : "") + " must already be installed, or run Deploy.ps1 -InstallersPath <folder> (C:\\DeployVare\\Installers is also tried)")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (.NET runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ")" : "Not included - anything missing (.NET 10 runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ") is installed from -InstallersPath or C:\\DeployVare\\Installers, otherwise downloaded from its official source")}");
         text.AppendLine();
         text.AppendLine("Instructions:");
         text.AppendLine("  1. Copy this folder to the database server (or the single server for an all-in-one install).");
@@ -428,7 +446,7 @@ exit 0
         text.AppendLine();
         text.AppendLine("       .\\Deploy.ps1");
         text.AppendLine();
-        text.AppendLine("  4. Then deploy the api\\ kit, then the frontend\\ kit.");
+        text.AppendLine("  4. Then deploy the API zip, then the frontend zip.");
         text.AppendLine();
         text.AppendLine("Deploy.ps1 installs the .NET runtime DbMigrator needs, installs SQL Server Express when Fresh");
         text.AppendLine("Database is chosen and none is installed (it prompts for the sa password, never logged),");

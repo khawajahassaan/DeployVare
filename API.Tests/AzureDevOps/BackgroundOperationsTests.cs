@@ -95,6 +95,33 @@ public class BackgroundOperationsTests : IDisposable
         Assert.Null(operations.GetFile(Id, null));
     }
 
+    [Fact]
+    public async Task TierZips_AreListed_AndEachDownloadsWithTheSameToken()
+    {
+        Directory.CreateDirectory(_root);
+        var names = new[] { "AuditVare_database-1_manual-deploy.zip", "AuditVare_api-1_manual-deploy.zip", "AuditVare_frontend-2_manual-deploy.zip" };
+        var paths = names.Select(n => Path.Combine(_root, n)).ToArray();
+        foreach (var path in paths) File.WriteAllText(path, Path.GetFileName(path));
+        var operations = Create();
+
+        operations.Start(Id, 7, "package", (_, _) =>
+        {
+            operations.AttachFile(Id, paths[0], names[0], "database");
+            operations.AttachFile(Id, paths[1], names[1], "api");
+            operations.AttachFile(Id, paths[2], names[2], "frontend");
+            return Task.FromResult<object?>("built");
+        });
+        var done = await WaitAsync(operations, Id, 7);
+
+        Assert.Equal(new[] { "database", "api", "frontend" }, done.Files.Select(f => f.Tier));
+        Assert.Equal(new[] { 0, 1, 2 }, done.Files.Select(f => f.Index));
+        Assert.Equal(names[0], done.FileName);
+        for (var i = 0; i < 3; i++)
+            Assert.Equal(paths[i], operations.GetFile(Id, done.DownloadToken, i)!.Path);
+        Assert.Null(operations.GetFile(Id, done.DownloadToken, 3));
+        Assert.Null(operations.GetFile(Id, done.DownloadToken, -1));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_root)) Directory.Delete(_root, true); } catch (IOException) { }
