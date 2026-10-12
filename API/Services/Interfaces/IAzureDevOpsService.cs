@@ -32,7 +32,10 @@ public interface IAzureDevOpsService
     Task<List<AzureBuildArtifactDto>> GetBuildArtifactsAsync(AzureDevOpsCredentials credentials, int buildId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Downloads an artifact as a ZIP file to <paramref name="destinationZipPath"/>.</summary>
+    /// <summary>
+    /// Downloads an artifact as a ZIP file to <paramref name="destinationZipPath"/>. <paramref name="onProgress"/>
+    /// receives (bytes so far, total bytes when the server declares it) about twice a second.
+    /// </summary>
     Task DownloadArtifactAsync(AzureDevOpsCredentials credentials, int buildId, string artifactName, string destinationZipPath,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, Action<long, long?>? onProgress = null);
 }

@@ -14,6 +14,9 @@ public interface IDeploymentProgressTracker
 
     void Complete(string? progressId, string stageKey, DeploymentStageState state = DeploymentStageState.Succeeded, string? detail = null);
 
+    /// <summary>Updates the detail line of a running stage (e.g. "120 MB of 192 MB") without changing its state.</summary>
+    void Report(string? progressId, string stageKey, string detail);
+
     /// <summary>Marks the running stage (or the next pending one) as failed.</summary>
     void Fail(string? progressId, string errorMessage);
 

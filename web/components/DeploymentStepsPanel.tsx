@@ -1,6 +1,7 @@
 'use client';
 
-import { Copy, CheckCircle2, Loader2, Circle, AlertTriangle } from 'lucide-react';
+import { Copy, CheckCircle2, Loader2, Circle, AlertTriangle, MinusCircle, XCircle } from 'lucide-react';
+import type { DeploymentProgress, DeploymentStageState } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
@@ -20,67 +21,101 @@ interface DeploymentStepsPanelProps {
   currentStepId?: string;
   isBuilding?: boolean;
   buildError?: string;
-  buildStep?: 'frontend' | 'backend' | 'combining';
+  /** Stages the server reports while it builds the package */
+  packageProgress?: DeploymentProgress | null;
+  /** Bytes of the finished zip received by the browser */
+  packageTransfer?: { loaded: number; total?: number } | null;
 }
 
-interface BuildingProgressProps {
-  currentStep?: 'frontend' | 'backend' | 'combining';
+const formatBytes = (bytes: number) =>
+  bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(2)} GB`
+  : bytes >= 1024 ** 2 ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+const formatDuration = (seconds: number) =>
+  `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+
+function StageIcon({ state }: { state: DeploymentStageState }) {
+  switch (state) {
+    case 'Running': return <Loader2 className="h-5 w-5 animate-spin text-brand-blue" />;
+    case 'Succeeded': return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
+    case 'Warning': return <AlertTriangle className="h-5 w-5 text-amber-600" />;
+    case 'Skipped': return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
+    case 'Failed': return <XCircle className="h-5 w-5 text-red-600" />;
+    default: return <Circle className="h-5 w-5 text-muted-foreground/60" />;
+  }
 }
 
-function BuildingProgress({ currentStep = 'frontend' }: BuildingProgressProps) {
+/** Real build progress: the server's stages, then the zip arriving in the browser. */
+function BuildingProgress({ progress, transfer }: { progress?: DeploymentProgress | null; transfer?: { loaded: number; total?: number } | null }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Ticks once a second, so a running stage's timer moves between polls
+  const [now, setNow] = useState(() => new Date().getTime());
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setElapsedSeconds(s => s + 1);
+      setElapsedSeconds((s) => s + 1);
+      setNow(new Date().getTime());
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const minutes = Math.floor(elapsedSeconds / 60);
-  const seconds = elapsedSeconds % 60;
+  // The last stage is the browser's own: it starts once the server has the zip ready
+  const serverDone = Boolean(progress?.isCompleted && progress.succeeded);
+  const sendState: DeploymentStageState = transfer && transfer.total && transfer.loaded >= transfer.total
+    ? 'Succeeded'
+    : serverDone || (transfer && transfer.loaded > 0) ? 'Running' : 'Pending';
+  const sendDetail = transfer && transfer.loaded > 0
+    ? transfer.total
+      ? `${formatBytes(transfer.loaded)} of ${formatBytes(transfer.total)} (${Math.floor((transfer.loaded * 100) / transfer.total)}%)`
+      : `${formatBytes(transfer.loaded)} received`
+    : serverDone ? 'Starting the download…' : null;
 
-  const steps = [
-    { id: 'frontend', label: 'Download Frontend', time: '2-5 min' },
-    { id: 'backend', label: 'Download Backend', time: '5-10 min' },
-    { id: 'combining', label: 'Combining Package', time: '1-2 min' },
+  const stages: { key: string; label: string; state: DeploymentStageState; detail?: string | null; startedAt?: string | null; completedAt?: string | null }[] = [
+    ...(progress?.stages ?? []),
+    { key: 'send', label: 'Send the package to your browser', state: sendState, detail: sendDetail },
   ];
 
   return (
     <div className="w-96 bg-slate-50 border-l border-border overflow-y-auto flex flex-col">
-      <div className="p-6 space-y-6 flex-1">
+      <div className="p-6 space-y-5 flex-1">
         <div>
           <h3 className="mb-1 text-[18px] font-normal text-ink">Building Package</h3>
-          <p className="text-xs text-muted-foreground">Preparing your deployment package</p>
+          <p className="text-xs text-muted-foreground">
+            {progress ? 'Live progress from the server' : 'Starting… the stages appear as soon as the server begins'}
+          </p>
         </div>
 
-        <div className="space-y-4">
-          {steps.map((step) => {
-            const isActive = currentStep === step.id;
-            const isCompleted = ['frontend', 'backend'].indexOf(currentStep) > ['frontend', 'backend'].indexOf(step.id);
-
+        <div className="space-y-2.5">
+          {stages.map((stage) => {
+            const seconds = stage.startedAt
+              ? Math.max(0, ((stage.completedAt ? new Date(stage.completedAt).getTime() : now) - new Date(stage.startedAt).getTime()) / 1000)
+              : null;
             return (
               <div
-                key={step.id}
-                className={`rounded-lg border p-4 transition-colors ${
-                  isActive
+                key={stage.key}
+                className={`rounded-[8px] border p-3 transition-colors ${
+                  stage.state === 'Running'
                     ? 'border-brand-blue/50 bg-accent ring-1 ring-brand-blue/20'
-                    : isCompleted
+                    : stage.state === 'Succeeded'
                       ? 'border-emerald-200 bg-emerald-50'
-                      : 'border-border bg-white'
+                      : stage.state === 'Failed'
+                        ? 'border-red-200 bg-red-50'
+                        : 'border-border bg-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0">
-                    {isActive && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-                    {isCompleted && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
-                    {!isActive && !isCompleted && <Circle className="h-5 w-5 text-muted-foreground" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm ${isActive ? 'text-primary' : isCompleted ? 'text-emerald-700' : 'text-muted-foreground'}`}>
-                      {step.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{step.time}</p>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex-shrink-0"><StageIcon state={stage.state} /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-[13px] ${stage.state === 'Pending' || stage.state === 'Skipped' ? 'text-muted-foreground' : 'text-ink'}`}>
+                        {stage.label}
+                      </p>
+                      {seconds !== null && seconds >= 1 && (
+                        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{formatDuration(seconds)}</span>
+                      )}
+                    </div>
+                    {stage.detail && <p className="mt-0.5 break-words text-[12px] text-label">{stage.detail}</p>}
                   </div>
                 </div>
               </div>
@@ -88,19 +123,10 @@ function BuildingProgress({ currentStep = 'frontend' }: BuildingProgressProps) {
           })}
         </div>
 
-        <div className="bg-slate-100 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground mb-2">Elapsed time:</p>
-          <p className="font-mono text-2xl font-bold">
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">Estimated total: 8-17 minutes</p>
+        <div className="rounded-[8px] bg-slate-100 p-4">
+          <p className="mb-1 text-xs text-muted-foreground">Elapsed time</p>
+          <p className="font-mono text-2xl">{formatDuration(elapsedSeconds)}</p>
         </div>
-      </div>
-
-      <div className="p-4 border-t border-border bg-white">
-        <p className="text-xs text-muted-foreground text-center">
-          Downloading in steps to avoid timeouts
-        </p>
       </div>
     </div>
   );
@@ -122,7 +148,7 @@ function BuildingError({ error }: { error: string }) {
           <p className="font-medium text-red-900 text-sm">Error:</p>
           <p className="text-xs text-red-800 font-mono break-all">{error}</p>
           <p className="text-xs text-red-700 mt-3">
-            <strong>Solution:</strong> Click "Generate package" again to retry, or check your Azure DevOps connection.
+            <strong>Solution:</strong> Click &quot;Generate package&quot; again to retry, or check your Azure DevOps connection.
           </p>
         </div>
       </div>
@@ -130,7 +156,7 @@ function BuildingError({ error }: { error: string }) {
   );
 }
 
-export function DeploymentStepsPanel({ steps, currentStepId, isBuilding, buildError, buildStep }: DeploymentStepsPanelProps) {
+export function DeploymentStepsPanel({ steps, currentStepId, isBuilding, buildError, packageProgress, packageTransfer }: DeploymentStepsPanelProps) {
   const copyCommand = (command: string) => {
     navigator.clipboard.writeText(command);
     toast.success('Command copied to clipboard');
@@ -138,7 +164,7 @@ export function DeploymentStepsPanel({ steps, currentStepId, isBuilding, buildEr
 
   // Show building progress while building
   if (isBuilding) {
-    return <BuildingProgress currentStep={buildStep} />;
+    return <BuildingProgress progress={packageProgress} transfer={packageTransfer} />;
   }
 
   // Show error if build failed

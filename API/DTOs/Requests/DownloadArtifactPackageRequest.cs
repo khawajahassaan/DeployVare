@@ -54,6 +54,10 @@ public class DownloadArtifactPackageRequest
     /// </summary>
     public bool Combined { get; set; }
 
+    /// <summary>Client-generated ID; the build reports its stages under it (GET apideployments/progress/{id}).</summary>
+    [MaxLength(64)]
+    public string? ProgressId { get; set; }
+
     /// <summary>Opposite-type server on the same application. Resolved automatically when there is only one.</summary>
     public int? CounterpartServerId { get; set; }
 

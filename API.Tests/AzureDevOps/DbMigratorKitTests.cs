@@ -75,16 +75,27 @@ public class DbMigratorKitTests : IDisposable
     }
 
     [Fact]
-    public void Copy_WithoutADependencyList_FallsBackToTheWholeFolder()
+    public void Copy_WithoutADependencyList_TakesTheLoadableFilesButNotTheWebContent()
     {
+        var app = PublishedApi(withDeps: false);
+        Directory.CreateDirectory(Path.Combine(app, "wwwroot"));
+        File.WriteAllText(Path.Combine(app, "wwwroot", "index.html"), "x");
+        Directory.CreateDirectory(Path.Combine(app, "Template"));
+        File.WriteAllText(Path.Combine(app, "Template", "letter.docx"), "x");
         var destination = Path.Combine(_root, "kit");
 
-        var result = DbMigratorKit.Copy(PublishedApi(withDeps: false), destination);
+        var result = DbMigratorKit.Copy(app, destination);
 
         Assert.True(result.Found);
         Assert.False(result.Trimmed);
-        Assert.Contains("API.dll", Listing(destination));
-        Assert.Contains("DbMigrator.exe", Listing(destination));
+        var listing = Listing(destination);
+        Assert.Contains("DbMigrator.exe", listing);
+        Assert.Contains("DbMigrator.runtimeconfig.json", listing);
+        Assert.Contains("dbup-sqlserver.dll", listing);
+        Assert.Contains("runtimes/win/lib/net9.0/Microsoft.Data.SqlClient.dll", listing);
+        Assert.DoesNotContain("appsettings.json", listing);
+        Assert.DoesNotContain("wwwroot/index.html", listing);
+        Assert.DoesNotContain("Template/letter.docx", listing);
     }
 
     [Fact]
@@ -95,7 +106,8 @@ public class DbMigratorKitTests : IDisposable
         var result = DbMigratorKit.Copy(PublishedApi(dropSqlClient: true), destination);
 
         Assert.False(result.Trimmed);
-        Assert.Contains("appsettings.json", Listing(destination));
+        Assert.Contains("DbMigrator.exe", Listing(destination));
+        Assert.Contains("dbup-sqlserver.dll", Listing(destination));
     }
 
     [Fact]

@@ -36,20 +36,28 @@ public static class ManualPackageBuilder
         string? licenseContent = null,
         string? deployScript = null,
         string? configJson = null,
-        IReadOnlyList<(string EntryName, string SourcePath)>? extraFiles = null)
+        IReadOnlyList<(string EntryName, string SourcePath)>? extraFiles = null,
+        Action<long, long>? onProgress = null)
     {
         var directory = Path.GetDirectoryName(zipPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
+        var hasScripts = !string.IsNullOrWhiteSpace(scriptsDirectory) && Directory.Exists(scriptsDirectory);
+        var progress = new ZipProgress(onProgress,
+            DirectorySize(appDirectory)
+            + (hasScripts ? DirectorySize(scriptsDirectory!) : 0)
+            + contentFolders.Sum(f => DirectorySize(f.Path))
+            + (extraFiles?.Where(f => File.Exists(f.SourcePath)).Sum(f => new FileInfo(f.SourcePath).Length) ?? 0));
+
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
 
-        AddDirectory(archive, appDirectory, AppFolder);
+        AddDirectory(archive, appDirectory, AppFolder, progress);
 
-        if (!string.IsNullOrWhiteSpace(scriptsDirectory) && Directory.Exists(scriptsDirectory))
-            AddDirectory(archive, scriptsDirectory!, ScriptsFolder);
+        if (hasScripts)
+            AddDirectory(archive, scriptsDirectory!, ScriptsFolder, progress);
 
         foreach (var folder in contentFolders)
-            AddDirectory(archive, folder.Path, $"{ContentFolder}/{folder.Name}");
+            AddDirectory(archive, folder.Path, $"{ContentFolder}/{folder.Name}", progress);
 
         if (!string.IsNullOrWhiteSpace(licenseFileName) && !string.IsNullOrWhiteSpace(licenseContent))
         {
@@ -78,6 +86,7 @@ public static class ManualPackageBuilder
             {
                 if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) continue;
                 archive.CreateEntryFromFile(sourcePath, entryName.Replace('\\', '/'), CompressionLevel.Fastest);
+                progress.Add(new FileInfo(sourcePath).Length);
             }
         }
 
@@ -104,12 +113,36 @@ public static class ManualPackageBuilder
         yield return Path.Combine(Directory.GetCurrentDirectory(), "API", "DeploymentScripts", DeployScriptName);
     }
 
-    private static void AddDirectory(ZipArchive archive, string sourceDirectory, string entryPrefix)
+    private static void AddDirectory(ZipArchive archive, string sourceDirectory, string entryPrefix, ZipProgress? progress = null)
     {
         foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(sourceDirectory, file).Replace('\\', '/');
             archive.CreateEntryFromFile(file, $"{entryPrefix}/{relativePath}", CompressionLevel.Fastest);
+            progress?.Add(new FileInfo(file).Length);
+        }
+    }
+
+    private static long DirectorySize(string directory) =>
+        Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length)
+            : 0;
+
+    /// <summary>Reports (bytes zipped, total bytes) at most twice a second, and once at the end.</summary>
+    private sealed class ZipProgress(Action<long, long>? callback, long total)
+    {
+        private long _done;
+        private DateTime _last = DateTime.MinValue;
+
+        public void Add(long bytes)
+        {
+            if (callback == null) return;
+            _done += bytes;
+            if (_done >= total || DateTime.UtcNow - _last > TimeSpan.FromMilliseconds(500))
+            {
+                _last = DateTime.UtcNow;
+                callback(_done, total);
+            }
         }
     }
 
@@ -227,16 +260,21 @@ public static class ManualPackageBuilder
         string frontendKitDirectory,
         string readme,
         string orchestrator,
-        string? databaseKitDirectory = null)
+        string? databaseKitDirectory = null,
+        Action<long, long>? onProgress = null)
     {
         var directory = Path.GetDirectoryName(zipPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
+        var hasDatabaseKit = !string.IsNullOrWhiteSpace(databaseKitDirectory);
+        var progress = new ZipProgress(onProgress,
+            DirectorySize(apiKitDirectory) + DirectorySize(frontendKitDirectory) + (hasDatabaseKit ? DirectorySize(databaseKitDirectory!) : 0));
+
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
-        if (!string.IsNullOrWhiteSpace(databaseKitDirectory))
-            AddDirectory(archive, databaseKitDirectory!, DatabaseKitFolder);
-        AddDirectory(archive, apiKitDirectory, ApiKitFolder);
-        AddDirectory(archive, frontendKitDirectory, FrontendKitFolder);
+        if (hasDatabaseKit)
+            AddDirectory(archive, databaseKitDirectory!, DatabaseKitFolder, progress);
+        AddDirectory(archive, apiKitDirectory, ApiKitFolder, progress);
+        AddDirectory(archive, frontendKitDirectory, FrontendKitFolder, progress);
 
         var scriptEntry = archive.CreateEntry(DeployScriptName, CompressionLevel.Optimal);
         using (var scriptWriter = new StreamWriter(scriptEntry.Open(), new UTF8Encoding(false)))

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using API.Data;
 using API.DTOs.Requests;
+using API.DTOs.Responses;
 using API.Models;
 using API.Models.Entities;
 using API.Models.Enums;
@@ -35,6 +36,7 @@ public class ManualPackageService : IManualPackageService
     private readonly IServerReadinessService _readinessService;
     private readonly IEncryptionService _encryptionService;
     private readonly ServerSetupOptions _setupOptions;
+    private readonly IDeploymentProgressTracker _progress;
     private readonly ILogger<ManualPackageService> _logger;
 
     public ManualPackageService(
@@ -46,6 +48,7 @@ public class ManualPackageService : IManualPackageService
         IServerReadinessService readinessService,
         IEncryptionService encryptionService,
         IOptions<ServerSetupOptions> setupOptions,
+        IDeploymentProgressTracker progress,
         ILogger<ManualPackageService> logger)
     {
         _context = context;
@@ -56,18 +59,72 @@ public class ManualPackageService : IManualPackageService
         _readinessService = readinessService;
         _encryptionService = encryptionService;
         _setupOptions = setupOptions.Value;
+        _progress = progress;
         _logger = logger;
     }
 
+    // Live progress of a package build, reported under the client's ProgressId (same tracker as deployments)
+    private static readonly (string Key, string Label)[] SingleStages =
+    {
+        ("download", "Download the build artifact"),
+        ("scripts", "Download the SQL scripts"),
+        ("kit", "Assemble the package (installers, config, licence)"),
+        ("zip", "Create the zip"),
+    };
+
+    private static readonly (string Key, string Label)[] CombinedStages =
+    {
+        ("api-download", "API: download the build artifact"),
+        ("api-scripts", "API: download the SQL scripts"),
+        ("api-kit", "API: assemble the kit"),
+        ("frontend-download", "Frontend: download the build artifact"),
+        ("frontend-kit", "Frontend: assemble the kit"),
+        ("database-kit", "Database: assemble the kit (DbMigrator, scripts, installers, backup)"),
+        ("zip", "Create the three-tier zip"),
+    };
+
     public async Task<ManualPackageResult> BuildAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.Combined)
-            return await BuildCombinedAsync(request, cancellationToken);
-
-        return await BuildSingleAsync(request, certificatePath: null, separateDatabase: false, cancellationToken);
+        var stages = new StageReporter(_progress, request.ProgressId, "");
+        _progress.Start(request.ProgressId, 0, request.Combined ? CombinedStages : SingleStages);
+        try
+        {
+            var result = request.Combined
+                ? await BuildCombinedAsync(request, stages, cancellationToken)
+                : await BuildSingleAsync(request, certificatePath: null, separateDatabase: false, stages, zipIsOwnStage: true, cancellationToken);
+            _progress.Finish(request.ProgressId, succeeded: true);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _progress.Fail(request.ProgressId, ex is OperationCanceledException ? "Cancelled: the browser stopped waiting." : ex.Message);
+            _progress.Finish(request.ProgressId, succeeded: false);
+            throw;
+        }
     }
 
-    private async Task<ManualPackageResult> BuildCombinedAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken)
+    /// <summary>Stage calls for one kit; the prefix ("api-", "frontend-") maps them onto the three-tier plan.</summary>
+    private sealed class StageReporter(IDeploymentProgressTracker tracker, string? progressId, string prefix)
+    {
+        public StageReporter For(string kitPrefix) => new(tracker, progressId, kitPrefix);
+        public void Begin(string key) => tracker.Begin(progressId, prefix + key);
+        public void Report(string key, string detail) => tracker.Report(progressId, prefix + key, detail);
+        public void Done(string key, string? detail = null) => tracker.Complete(progressId, prefix + key, DeploymentStageState.Succeeded, detail);
+        public void Skip(string key, string detail) => tracker.Complete(progressId, prefix + key, DeploymentStageState.Skipped, detail);
+
+        public Action<long, long?> Download(string key) => (done, total) =>
+            Report(key, total is long t && t > 0 ? $"{Size(done)} of {Size(t)} ({done * 100 / t}%)" : $"{Size(done)} downloaded");
+
+        public Action<long, long> Zip(string key, string label) => (done, total) =>
+            Report(key, $"{label} {(total > 0 ? done * 100 / total : 100)}% ({Size(done)} of {Size(total)})");
+    }
+
+    private static string Size(long bytes) =>
+        bytes >= 1024L * 1024 * 1024 ? $"{bytes / (1024d * 1024 * 1024):0.00} GB"
+        : bytes >= 1024 * 1024 ? $"{bytes / (1024d * 1024):0.0} MB"
+        : $"{Math.Max(1, bytes / 1024)} KB";
+
+    private async Task<ManualPackageResult> BuildCombinedAsync(DownloadArtifactPackageRequest request, StageReporter stages, CancellationToken cancellationToken)
     {
         var selectedContext = await _azureDevOpsConfigService.ResolveDeploymentContextAsync(
             request.ApplicationServerId, request.Environment, cancellationToken);
@@ -106,8 +163,11 @@ public class ManualPackageService : IManualPackageService
             var frontendRequest = ForInnerServer(request, frontendServer.Id, frontendBuildId, frontendArtifact, frontendHost, isApi: false);
 
             // Three tiers: the API kit leaves SQL Server, the restore and DbMigrator to the database kit
-            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, separateDatabase: true, cancellationToken);
-            frontendPackage = await BuildSingleAsync(frontendRequest, certificateTemp, separateDatabase: false, cancellationToken);
+            apiPackage = await BuildSingleAsync(apiRequest, certificateTemp, separateDatabase: true, stages.For("api-"), zipIsOwnStage: false, cancellationToken);
+            frontendPackage = await BuildSingleAsync(frontendRequest, certificateTemp, separateDatabase: false, stages.For("frontend-"), zipIsOwnStage: false, cancellationToken);
+
+            stages.Begin("database-kit");
+            stages.Report("database-kit", "Unpacking the API and frontend kits");
 
             var apiDir = Path.Combine(workspace, ManualPackageBuilder.ApiKitFolder);
             var frontendDir = Path.Combine(workspace, ManualPackageBuilder.FrontendKitFolder);
@@ -119,9 +179,13 @@ public class ManualPackageService : IManualPackageService
             var frontendBuildNumber = ExtractBuildNumber(frontendPackage.FileName);
 
             var databaseDir = Path.Combine(workspace, ManualPackageBuilder.DatabaseKitFolder);
-            var databaseConfig = BuildDatabaseKit(apiDir, databaseDir, apiServer, request, apiBuildNumber, apiPackage.SqlFileCount);
+            stages.Report("database-kit", "Copying DbMigrator, SQL scripts, installers and the baseline backup");
+            var (databaseConfig, databaseDetail) = BuildDatabaseKit(apiDir, databaseDir, apiServer, request, apiBuildNumber, apiPackage.SqlFileCount);
+            stages.Done("database-kit", databaseDetail);
             var fileName = ManualPackageBuilder.BuildCombinedFileName(applicationName, apiBuildNumber, frontendBuildNumber);
             var zipPath = Path.Combine(workspace, fileName);
+
+            stages.Begin("zip");
 
             await Task.Run(() => ManualPackageBuilder.BuildCombined(
                 zipPath,
@@ -137,7 +201,9 @@ public class ManualPackageService : IManualPackageService
                     freshDatabase: databaseConfig.FreshDatabase,
                     databaseName: databaseConfig.DatabaseName),
                 ManualPackageBuilder.BuildCombinedDeployScript(),
-                databaseDir), cancellationToken);
+                databaseDir,
+                stages.Zip("zip", "Zipping")), cancellationToken);
+            stages.Done("zip", $"{fileName} ({Size(new FileInfo(zipPath).Length)})");
 
             RemoveIntermediateFiles(workspace, zipPath);
 
@@ -225,6 +291,8 @@ public class ManualPackageService : IManualPackageService
         DownloadArtifactPackageRequest request,
         string? certificatePath,
         bool separateDatabase,
+        StageReporter stages,
+        bool zipIsOwnStage,
         CancellationToken cancellationToken)
     {
         var context = await _azureDevOpsConfigService.ResolveDeploymentContextAsync(
@@ -288,7 +356,11 @@ public class ManualPackageService : IManualPackageService
                 build.BuildNumber, artifact.Name, server.ServerName);
 
             var artifactZipPath = Path.Combine(workspace, "artifact.zip");
-            await _azureDevOpsService.DownloadArtifactAsync(context.Credentials, build.Id, artifact.Name, artifactZipPath, cancellationToken);
+            stages.Begin("download");
+            stages.Report("download", $"'{artifact.Name}' from build #{build.BuildNumber}");
+            await _azureDevOpsService.DownloadArtifactAsync(context.Credentials, build.Id, artifact.Name, artifactZipPath, cancellationToken,
+                stages.Download("download"));
+            stages.Done("download", $"'{artifact.Name}' #{build.BuildNumber}, {Size(new FileInfo(artifactZipPath).Length)}");
 
             var package = await Task.Run(() => ArtifactPackageBuilder.Build(
                 artifactZipPath, workspace, artifact.Name, server.ServerType, source.ArtifactSubfolder), cancellationToken);
@@ -306,15 +378,29 @@ public class ManualPackageService : IManualPackageService
                 if (scriptsArtifact != null)
                 {
                     var scriptsZipPath = Path.Combine(workspace, "sqlscripts-artifact.zip");
-                    await _azureDevOpsService.DownloadArtifactAsync(context.Credentials, build.Id, scriptsArtifact.Name, scriptsZipPath, cancellationToken);
+                    stages.Begin("scripts");
+                    await _azureDevOpsService.DownloadArtifactAsync(context.Credentials, build.Id, scriptsArtifact.Name, scriptsZipPath, cancellationToken,
+                        stages.Download("scripts"));
 
                     var scripts = await Task.Run(() =>
                         ArtifactPackageBuilder.BuildScriptsPackage(scriptsZipPath, workspace, scriptsArtifact.Name), cancellationToken);
 
                     scriptsDirectory = scripts.ContentDirectory;
                     sqlFileCount = scripts.SqlFileCount;
+                    stages.Done("scripts", $"'{scriptsArtifact.Name}', {sqlFileCount} script(s)");
+                }
+                else
+                {
+                    stages.Skip("scripts", $"This build has no '{scriptsArtifactName}' artifact");
                 }
             }
+            else
+            {
+                stages.Skip("scripts", "Frontend builds have no SQL scripts");
+            }
+
+            stages.Begin("kit");
+            stages.Report("kit", "Adding installers, configuration and Deploy.ps1");
 
             if (isFrontend)
                 WriteFrontendConfigJs(server, package.ContentDirectory);
@@ -359,6 +445,12 @@ public class ManualPackageService : IManualPackageService
             var deployScript = ManualPackageBuilder.LoadDeployScript();
             var configJson = JsonSerializer.Serialize(config, ConfigJson);
 
+            if (zipIsOwnStage)
+            {
+                stages.Done("kit", $"{package.Files.Count} app file(s), {extraFiles.Count} installer/extra file(s)");
+                stages.Begin("zip");
+            }
+            var zipStage = zipIsOwnStage ? "zip" : "kit";
             await Task.Run(() => ManualPackageBuilder.Build(
                 zipPath,
                 package.ContentDirectory,
@@ -369,7 +461,11 @@ public class ManualPackageService : IManualPackageService
                 licenseFile?.Content,
                 deployScript,
                 configJson,
-                extraFiles), cancellationToken);
+                extraFiles,
+                stages.Zip(zipStage, zipIsOwnStage ? "Zipping" : "Packing")), cancellationToken);
+            stages.Done(zipStage, zipIsOwnStage
+                ? $"{fileName} ({Size(new FileInfo(zipPath).Length)})"
+                : $"{package.Files.Count} app file(s), {extraFiles.Count} installer/extra file(s)");
 
             RemoveIntermediateFiles(workspace, zipPath);
 
@@ -491,7 +587,7 @@ public class ManualPackageService : IManualPackageService
     /// (moved out of the API kit), DbMigrator, the .NET runtime installer DbMigrator needs, SQL Express and
     /// the baseline backup for Fresh Database, Deploy.ps1 and its config.
     /// </summary>
-    private ManualDeployConfig BuildDatabaseKit(
+    private (ManualDeployConfig Config, string Detail) BuildDatabaseKit(
         string apiKitDirectory,
         string databaseKitDirectory,
         ApplicationServer apiServer,
@@ -506,6 +602,7 @@ public class ManualPackageService : IManualPackageService
 
         var scriptsSource = Path.Combine(apiKitDirectory, ManualPackageBuilder.ScriptsFolder);
         var hasScripts = Directory.Exists(scriptsSource);
+        var migratorDetail = "no SQL scripts in this build";
         if (hasScripts)
         {
             Directory.Move(scriptsSource, Path.Combine(databaseKitDirectory, ManualPackageBuilder.ScriptsFolder));
@@ -517,6 +614,7 @@ public class ManualPackageService : IManualPackageService
                 throw new InvalidOperationException(
                     "DbMigrator.exe was not found in the API build, so the database kit cannot run the SQL scripts.");
             _logger.LogInformation("DatabaseKit DbMigrator copied: {Files} file(s), trimmed {Trimmed}", migrator.FileCount, migrator.Trimmed);
+            migratorDetail = $"DbMigrator ({migrator.FileCount} files), {sqlFileCount} script(s)";
         }
 
         // The API kit no longer carries the scripts
@@ -564,7 +662,8 @@ public class ManualPackageService : IManualPackageService
         File.WriteAllText(Path.Combine(databaseKitDirectory, ManualPackageBuilder.ReadmeName),
             ManualPackageBuilder.BuildDatabaseReadme(config, buildNumber, sqlFileCount), new UTF8Encoding(false));
 
-        return config;
+        var detail = migratorDetail + (request.FreshDatabase ? ", SQL Express and the baseline backup" : "");
+        return (config, detail);
     }
 
     private string FindBaselineBackup()

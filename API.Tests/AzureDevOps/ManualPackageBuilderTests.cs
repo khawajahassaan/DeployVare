@@ -251,6 +251,25 @@ public class ManualPackageBuilderTests : IDisposable
     }
 
     [Fact]
+    public void ThreeTierZip_ReportsProgressUpToTheFullSize()
+    {
+        var database = NewDirectory("db-kit", "Deploy.ps1", Path.Combine("dbmigrator", "DbMigrator.exe"));
+        var api = NewDirectory("api-kit2", "Deploy.ps1", Path.Combine("app", "API.dll"), Path.Combine("app", "web.config"));
+        var frontend = NewDirectory("web-kit2", "Deploy.ps1", Path.Combine("app", "index.html"));
+        var expectedTotal = new[] { database, api, frontend }
+            .SelectMany(d => Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories))
+            .Sum(f => new FileInfo(f).Length);
+        var reports = new List<(long Done, long Total)>();
+
+        ManualPackageBuilder.BuildCombined(Path.Combine(_root, "progress.zip"), api, frontend, "readme",
+            ManualPackageBuilder.BuildCombinedDeployScript(), database, (done, total) => reports.Add((done, total)));
+
+        Assert.NotEmpty(reports);
+        Assert.All(reports, r => Assert.Equal(expectedTotal, r.Total));
+        Assert.Equal(expectedTotal, reports[^1].Done);
+    }
+
+    [Fact]
     public void CombinedFileName_IncludesBothBuilds()
     {
         Assert.Equal(

@@ -23,11 +23,10 @@ public static class DbMigratorKit
         var files = TrimmedFileList(baseDir);
         var trimmed = files != null;
 
-        // Without a usable dependency list, take the whole folder: bigger, but it is exactly what
-        // DbMigrator runs with on an API server
-        files ??= Directory.EnumerateFiles(baseDir, "*", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(baseDir, f))
-            .ToList();
+        // Without a usable dependency list (the API publish does not carry DbMigrator.deps.json), take what the
+        // .NET host can load from the folder: DbMigrator itself, every assembly next to it and the native
+        // runtimes. The web application's content (wwwroot, templates, upload folders) is left behind.
+        files ??= LoadableFiles(baseDir);
 
         foreach (var relative in files)
         {
@@ -37,6 +36,20 @@ public static class DbMigratorKit
         }
 
         return new Result(true, trimmed, files.Count);
+    }
+
+    private static List<string> LoadableFiles(string baseDir)
+    {
+        var top = Directory.EnumerateFiles(baseDir, "*", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Where(name => name!.StartsWith("DbMigrator.", StringComparison.OrdinalIgnoreCase)
+                           || name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            .Select(name => name!);
+        var runtimes = Path.Combine(baseDir, "runtimes");
+        var native = Directory.Exists(runtimes)
+            ? Directory.EnumerateFiles(runtimes, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(baseDir, f))
+            : Enumerable.Empty<string>();
+        return top.Concat(native).ToList();
     }
 
     private static string? FindExe(string appDirectory)

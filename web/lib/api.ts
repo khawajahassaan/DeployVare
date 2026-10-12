@@ -1075,7 +1075,9 @@ export const api = {
     combined?: boolean;
     counterpartServerId?: number;
     counterpartSiteHostName?: string;
-  }): Promise<{ blob: Blob; fileName: string }> {
+    /** The server reports its build stages under this ID (getDeploymentProgress) */
+    progressId?: string;
+  }, onTransfer?: (loaded: number, total?: number) => void): Promise<{ blob: Blob; fileName: string }> {
     const form = new FormData();
     form.append('applicationServerId', String(data.applicationServerId));
     form.append('environment', data.environment);
@@ -1092,7 +1094,12 @@ export const api = {
     form.append('combined', data.combined ? 'true' : 'false');
     if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
     if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
-    const response = await apiClient.post('/apideployments/azure-artifact/package', form, { responseType: 'blob' });
+    if (data.progressId) form.append('progressId', data.progressId);
+    const response = await apiClient.post('/apideployments/azure-artifact/package', form, {
+      responseType: 'blob',
+      // Bytes of the finished zip arriving from the server (after the build stages)
+      onDownloadProgress: onTransfer ? (event) => onTransfer(event.loaded, event.total ?? undefined) : undefined,
+    });
     const disposition = String(response.headers['content-disposition'] ?? '');
     const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
     return { blob: response.data as Blob, fileName: match ? decodeURIComponent(match[1]) : 'manual-deploy.zip' };

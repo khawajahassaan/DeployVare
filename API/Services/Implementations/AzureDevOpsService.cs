@@ -150,7 +150,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     }
 
     public async Task DownloadArtifactAsync(AzureDevOpsCredentials credentials, int buildId, string artifactName, string destinationZipPath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, Action<long, long?>? onProgress = null)
     {
         _logger.LogInformation("ArtifactDownloadStarted build {BuildId} artifact {ArtifactName} for {Target}", buildId, artifactName, credentials);
 
@@ -190,6 +190,8 @@ public class AzureDevOpsService : IAzureDevOpsService
                 await using var target = new FileStream(destinationZipPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
 
                 var buffer = new byte[81920];
+                var declaredLength = response.Content.Headers.ContentLength;
+                var lastReport = DateTime.MinValue;
                 int read;
                 while ((read = await source.ReadAsync(buffer, timeout.Token)) > 0)
                 {
@@ -198,7 +200,14 @@ public class AzureDevOpsService : IAzureDevOpsService
                         throw new AzureDevOpsException(AzureDevOpsErrorCode.ArtifactTooLarge,
                             $"Artifact '{artifactName}' exceeds the {_options.MaxArtifactSizeMB} MB limit.");
                     await target.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
+
+                    if (onProgress != null && DateTime.UtcNow - lastReport > TimeSpan.FromMilliseconds(500))
+                    {
+                        lastReport = DateTime.UtcNow;
+                        onProgress(total, declaredLength);
+                    }
                 }
+                onProgress?.Invoke(total, declaredLength);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

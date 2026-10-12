@@ -54,6 +54,12 @@ public sealed class DeploymentProgressTracker : IDeploymentProgressTracker
             stage.CompletedAt = now;
         });
 
+    public void Report(string? progressId, string stageKey, string detail) => Update(progressId, progress =>
+    {
+        var stage = progress.Stages.FirstOrDefault(s => s.Key == stageKey);
+        if (stage is { State: DeploymentStageState.Running }) stage.Detail = detail;
+    });
+
     public void Fail(string? progressId, string errorMessage) => Update(progressId, progress =>
     {
         progress.ErrorMessage = errorMessage;

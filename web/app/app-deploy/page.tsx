@@ -152,6 +152,9 @@ export default function AppDeployPage() {
   const [deploying, setDeploying] = useState(false);
   const [deploymentResult, setDeploymentResult] = useState<ApiDeploymentResult | null>(null);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
+  // Manual package build: stages reported by the server, then the zip arriving in the browser
+  const [packageProgress, setPackageProgress] = useState<DeploymentProgress | null>(null);
+  const [packageTransfer, setPackageTransfer] = useState<{ loaded: number; total?: number } | null>(null);
   const [downloadingPackage, setDownloadingPackage] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
   const [packageKind, setPackageKind] = useState<'single' | 'combined'>('single');
@@ -510,6 +513,20 @@ export default function AppDeployPage() {
 
     setDownloadingPackage(true);
     setPackageBuildError('');
+    setPackageProgress(null);
+    setPackageTransfer(null);
+
+    const packageProgressId = newProgressId();
+    const pollPackage = async () => {
+      try {
+        const latest = await api.getDeploymentProgress(packageProgressId);
+        if (latest) setPackageProgress((previous) => (previous?.isCompleted && !latest.isCompleted ? previous : latest));
+      } catch {
+        // Progress is best effort; the download itself is authoritative
+      }
+    };
+    const packagePollTimer = setInterval(pollPackage, 1500);
+
     try {
       const { blob, fileName } = await api.downloadDeploymentPackage({
         applicationServerId: selectedServerId,
@@ -525,7 +542,8 @@ export default function AppDeployPage() {
         combined: packageKind === 'combined',
         counterpartServerId: packageKind === 'combined' ? counterpartServerId : undefined,
         counterpartSiteHostName: packageKind === 'combined' ? counterpartSiteHostName.trim() : undefined,
-      });
+        progressId: packageProgressId,
+      }, (loaded, total) => setPackageTransfer({ loaded, total }));
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -549,6 +567,7 @@ export default function AppDeployPage() {
       }
       setPackageBuildError(message);
     } finally {
+      clearInterval(packagePollTimer);
       setDownloadingPackage(false);
     }
   };
@@ -1572,6 +1591,8 @@ export default function AppDeployPage() {
               currentStepId={downloadingPackage ? 'building' : 'extract'}
               isBuilding={downloadingPackage}
               buildError={packageBuildError}
+              packageProgress={packageProgress}
+              packageTransfer={packageTransfer}
             />
           </div>
         </DialogContent>

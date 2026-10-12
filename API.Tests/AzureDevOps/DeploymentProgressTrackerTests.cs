@@ -114,6 +114,24 @@ public class DeploymentProgressTrackerTests
     }
 
     [Fact]
+    public void Report_UpdatesOnlyARunningStage()
+    {
+        var tracker = new DeploymentProgressTracker();
+        tracker.Start(ProgressId, 0, new[] { ("download", "Download"), ("zip", "Zip") });
+
+        tracker.Report(ProgressId, "download", "ignored while pending");
+        Assert.Null(Stage(tracker.Get(ProgressId)!, "download").Detail);
+
+        tracker.Begin(ProgressId, "download");
+        tracker.Report(ProgressId, "download", "96.0 MB of 192.0 MB (50%)");
+        Assert.Equal("96.0 MB of 192.0 MB (50%)", Stage(tracker.Get(ProgressId)!, "download").Detail);
+
+        tracker.Complete(ProgressId, "download", detail: "192.0 MB");
+        tracker.Report(ProgressId, "download", "late report");
+        Assert.Equal("192.0 MB", Stage(tracker.Get(ProgressId)!, "download").Detail);
+    }
+
+    [Fact]
     public void UnknownProgressId_ReturnsNull()
     {
         Assert.Null(StartedTracker().Get("00000000-0000-0000-0000-000000000000"));
