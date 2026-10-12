@@ -205,11 +205,16 @@ function Ensure-Site([string]$Site, [string]$Pool, [string]$Path, [string]$HostH
         New-WebBinding -Name $Site -Protocol 'https' -Port 443 -IPAddress '*' -HostHeader $HostHeader -SslFlags 1
         $https = Get-WebBinding -Name $Site -Protocol 'https' -Port 443 -HostHeader $HostHeader
     }
+    # A certificate already bound to this host name (e.g. a real one from win-acme / Let's Encrypt) is kept;
+    # the default certificate only goes on a host name that has none yet
     $sslPath = "IIS:\SslBindings\!443!$HostHeader"
     $current = Get-Item -Path $sslPath -ErrorAction SilentlyContinue
-    if ($current -and $current.Thumbprint -ne $Thumbprint) { Remove-Item -Path $sslPath -Force; $current = $null }
-    if (-not $current) { $https.AddSslCertificate($Thumbprint, 'My') }
-    Write-Step "[OK] https://$HostHeader bound (SNI)"
+    if ($current) {
+        Write-Step "[OK] https://$HostHeader keeps its certificate ($($current.Thumbprint))"
+    } else {
+        $https.AddSslCertificate($Thumbprint, 'My')
+        Write-Step "[OK] https://$HostHeader bound to the default certificate (SNI)"
+    }
 }
 
 function Grant-Folder([string]$Path, [string]$Pool, [string]$Rights) {
