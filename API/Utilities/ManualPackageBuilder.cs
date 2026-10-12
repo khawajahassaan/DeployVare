@@ -159,7 +159,7 @@ public static class ManualPackageBuilder
         text.AppendLine($"Site URL:           https://{config.SiteHostName}");
         text.AppendLine($"Database Mode:      {(config.ServerType == "Frontend" ? "n/a (frontend)" : config.SeparateDatabase ? "Handled by the database kit (run it first)" : config.FreshDatabase ? "Fresh Database" : "Existing Database")}");
         text.AppendLine($"Certificate:        {(config.CertificateMode == "UserProvided" ? "Packaged .pfx (password prompted on the server)" : "Default / already-installed certificate")}");
-        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - " + (config.ServerType == "Frontend" ? "IIS and IIS URL Rewrite" : "IIS, the .NET Hosting Bundle, the .NET SDK and Memurai") + " must already be installed")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (installed when missing)" : "Not included - " + (config.ServerType == "Frontend" ? "IIS and IIS URL Rewrite" : "IIS, the .NET Hosting Bundle, the .NET SDK and Memurai") + " must already be installed, or run Deploy.ps1 -InstallersPath <folder> (C:\\DeployVare\\Installers is also tried)")}");
         if (config.ServerType != "Frontend")
             text.AppendLine($"Redis:              Memurai (Redis {config.RequiredRedisMajor} on port {config.RedisPort})");
         if (!string.IsNullOrWhiteSpace(config.LicenseFileName))
@@ -292,7 +292,9 @@ public static class ManualPackageBuilder
 # for separate database / API / frontend servers, copy one folder to each server and run its Deploy.ps1.
 # The database settings are asked once here and handed to the database and API kits so they match.
 # -UseDefaults deploys with the values the package was built with, without asking.
-param([switch]$UseDefaults)
+# -InstallersPath <folder> is handed to every kit: missing prerequisites are installed from there when the package
+# has no installers (C:\DeployVare\Installers is also tried).
+param([switch]$UseDefaults, [string]$InstallersPath)
 $ErrorActionPreference = 'Stop'
 $PackageRoot = $PSScriptRoot
 
@@ -331,6 +333,7 @@ Assert-Admin
 
 $shared = @()
 if ($UseDefaults) { $shared += '-UseDefaults' }
+if ($InstallersPath) { $shared += @('-InstallersPath', $InstallersPath) }
 
 $dbArgs = @()
 $dbConfigPath = Join-Path $PackageRoot 'database\deploy-config.json'
@@ -416,7 +419,7 @@ exit 0
         text.AppendLine($"Database:           {config.DatabaseName}");
         text.AppendLine($"Database Mode:      {(config.FreshDatabase ? "Fresh Database (installs SQL Express if needed, restores the baseline backup)" : "Existing Database (must already exist)")}");
         text.AppendLine($"SQL scripts:        {sqlFileCount} (run by DbMigrator)");
-        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (.NET runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ")" : "Not included - the .NET 10 runtime" + (config.FreshDatabase ? " and SQL Server" : "") + " must already be installed")}");
+        text.AppendLine($"Installers:         {(config.IncludesInstallers ? "Included (.NET runtime" + (config.FreshDatabase ? ", SQL Server Express" : "") + ")" : "Not included - the .NET 10 runtime" + (config.FreshDatabase ? " and SQL Server" : "") + " must already be installed, or run Deploy.ps1 -InstallersPath <folder> (C:\\DeployVare\\Installers is also tried)")}");
         text.AppendLine();
         text.AppendLine("Instructions:");
         text.AppendLine("  1. Copy this folder to the database server (or the single server for an all-in-one install).");

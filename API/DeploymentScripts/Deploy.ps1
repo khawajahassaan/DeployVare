@@ -4,17 +4,26 @@
 # Shows the names it will use (IIS site, app pool, folder, host name, SQL Server, database) and lets you keep
 # each with Enter or type a new one. -UseDefaults takes the packaged values without asking. The three-tier
 # root Deploy.ps1 passes -DatabaseName / -SqlDataSource / -SqlInstanceName so the database and API kits match.
+# A missing prerequisite is installed from the package's installers folder, then from -InstallersPath, then from
+# C:\DeployVare\Installers (where the DeployVare server keeps them), so a package without installers still works there.
 param(
     [switch]$UseDefaults,
     [string]$DatabaseName,
     [string]$SqlDataSource,
-    [string]$SqlInstanceName
+    [string]$SqlInstanceName,
+    [string]$InstallersPath
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $PackageRoot = $PSScriptRoot
 $ConfigPath = Join-Path $PackageRoot 'deploy-config.json'
+$InstallerDirs = @(
+    @((Join-Path $PackageRoot 'installers'), $InstallersPath, 'C:\DeployVare\Installers') |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } |
+        ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') + '\' } |
+        Select-Object -Unique
+)
 $LogLines = New-Object System.Collections.Generic.List[string]
 
 function Write-Step([string]$Message) {
@@ -124,12 +133,15 @@ function Confirm-Settings([object]$Cfg) {
     }
 }
 
+# Newest matching installer from the first folder that has one (package, -InstallersPath, C:\DeployVare\Installers).
 function Installer-Path([string]$Pattern) {
-    $dir = Join-Path $PackageRoot 'installers'
-    if (-not (Test-Path -LiteralPath $dir)) { return $null }
-    return Get-ChildItem -LiteralPath $dir -Filter $Pattern -File -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1 -ExpandProperty FullName
+    foreach ($dir in $InstallerDirs) {
+        $file = Get-ChildItem -LiteralPath $dir -Filter $Pattern -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+        if ($file) { return $file }
+    }
+    return $null
 }
 
 # Message for a missing prerequisite with no installer in the package. A package downloaded with
@@ -137,17 +149,17 @@ function Installer-Path([string]$Pattern) {
 function Missing-Installer([object]$Cfg, [string]$What, [string]$Usual) {
     if ($Cfg.includesInstallers -eq $false) {
         return "$What is not installed on this server, and this package was built without installers. " +
-               "Install $What first, or download the package again with 'Include installers' ticked."
+               "Install $What first, run .\Deploy.ps1 -InstallersPath <folder with the installers>, " +
+               "or download the package again with 'Include installers' ticked."
     }
     return $Usual
 }
 
 function Invoke-KnownInstaller([string]$File, [int]$TimeoutMinutes) {
     if (-not $File) { throw 'Installer path is empty.' }
-    $installersRoot = [IO.Path]::GetFullPath((Join-Path $PackageRoot 'installers'))
     $full = [IO.Path]::GetFullPath($File)
-    if (-not $full.StartsWith($installersRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to run installer outside the package installers folder: $File"
+    if (-not ($InstallerDirs | Where-Object { $full.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) })) {
+        throw "Refusing to run installer outside the installers folders: $File"
     }
     if (-not (Test-Path -LiteralPath $full)) { throw "Installer not found: $File" }
     $timeoutMs = [Math]::Max(1, $TimeoutMinutes) * 60000
@@ -245,7 +257,11 @@ function Ensure-DotNet([object]$Cfg) {
     $sdkOk = $sdks | Where-Object { [int](($_ -split '\.')[0]) -ge $minSdk }
     if (-not $sdkOk) {
         $file = Installer-Path 'dotnet-sdk-*-win-x64.exe'
-        if (-not $file) { Fail (Missing-Installer $Cfg ".NET SDK $minSdk or newer" "No .NET SDK $minSdk or newer is installed and no SDK installer is in the package.") }
+        if (-not $file) {
+            # The API runs on the Hosting Bundle; the SDK only helps with tooling, so its absence does not stop the deploy
+            Write-Step "[WARN] No .NET SDK $minSdk or newer is installed and no SDK installer was found. Continuing without it."
+            return
+        }
         Write-Step "Installing .NET SDK ($([IO.Path]::GetFileName($file)))..."
         Invoke-KnownInstaller $file 30
         Write-Step '[OK] .NET SDK installed'
@@ -307,6 +323,12 @@ function Ensure-Memurai([object]$Cfg) {
             if ($svc.Status -ne 'Running') { Start-Service -Name Memurai }
         }
         Write-Step "[OK] Memurai is running (Redis-compatible on port $port)"
+        return
+    }
+    if ($svc -and $svc.Name -eq 'Redis') {
+        Set-Service -Name Redis -StartupType Automatic
+        if ($svc.Status -ne 'Running') { Start-Service -Name Redis }
+        Write-Step "[OK] Redis service is running (port $port)"
         return
     }
     $file = Installer-Path 'Memurai*.msi'
