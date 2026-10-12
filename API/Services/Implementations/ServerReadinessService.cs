@@ -936,6 +936,8 @@ public class ServerReadinessService : IServerReadinessService
             $command.CommandTimeout = 120
             $null = $command.Parameters.AddWithValue('@database', $database)
             $null = $command.Parameters.AddWithValue('@login', $login)
+            # Only the grant script defines $deployVareLogin; elsewhere it is empty and unused
+            $null = $command.Parameters.AddWithValue('@deployVareLogin', [string]$deployVareLogin)
             $reader = $command.ExecuteReader()
             $rows = @()
             try {
@@ -1082,8 +1084,11 @@ public class ServerReadinessService : IServerReadinessService
         ELSE
             INSERT @messages (Message) VALUES (@userName + N' is already a member of db_owner');
 
-        -- Grant access to DeployVare user (current login)
-        IF @deployVareLogin IS NOT NULL AND @deployVareLogin != N''
+        -- Grant access to DeployVare user (current login). A sysadmin already has every right, and is usually
+        -- the database owner (dbo), which cannot be added to db_owner, so it is left alone.
+        IF @deployVareLogin IS NOT NULL AND @deployVareLogin != N'' AND IS_SRVROLEMEMBER(N'sysadmin', @deployVareLogin) = 1
+            INSERT @messages (Message) VALUES (@deployVareLogin + N' is a sysadmin; it already has full access');
+        ELSE IF @deployVareLogin IS NOT NULL AND @deployVareLogin != N''
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @deployVareLogin)
             BEGIN
