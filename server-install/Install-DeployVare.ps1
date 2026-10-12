@@ -346,6 +346,8 @@ Copy-Folder (Join-Path $PackageRoot 'api') $apiPath -KeepFiles @('appsettings.Pr
 Write-Step '[OK] API files copied'
 Write-ApiSettings $apiPath "Server=$sqlServer;Database=$database;Integrated Security=True;MultipleActiveResultSets=True;TrustServerCertificate=True" "https://$webHost" $installersPath
 & icacls $apiPath /grant ('IIS AppPool\' + $apiPool + ':(OI)(CI)RX') /Q | Out-Null
+# The API writes uploads and backups under data\ (created at startup) and its logs under logs\
+Grant-Folder (Join-Path $apiPath 'data') $apiPool 'M'
 Grant-Folder (Join-Path $apiPath 'wwwroot') $apiPool 'M'
 Grant-Folder (Join-Path $apiPath 'logs') $apiPool 'M'
 Grant-Folder (Join-Path $env:ProgramData 'DeployVare') $apiPool 'M'
