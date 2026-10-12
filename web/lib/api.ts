@@ -327,6 +327,78 @@ export interface DeploymentStage {
   completedAt?: string | null;
 }
 
+export type BackgroundOperationStatus = 'Running' | 'Succeeded' | 'Failed';
+
+/** A long action running on the server outside the request that started it. */
+export interface BackgroundOperation {
+  operationId: string;
+  kind: 'deployment' | 'package' | string;
+  status: BackgroundOperationStatus;
+  error?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+  result?: unknown;
+  fileName?: string | null;
+  fileSizeBytes?: number | null;
+  downloadToken?: string | null;
+}
+
+export interface AzureArtifactDeployRequest {
+  applicationServerId: number;
+  environment: ArtifactEnvironment;
+  buildId: number;
+  artifactName: string;
+  version?: string;
+  progressId?: string;
+  // Omitted means WithoutLicense on the server, so an older caller deploys exactly as before
+  licensingMode?: 'WithoutLicense' | 'WithLicense';
+  licenseId?: number;
+}
+
+export interface PackageRequest {
+  applicationServerId: number;
+  environment: ArtifactEnvironment;
+  buildId: number;
+  artifactName: string;
+  licensingMode?: 'WithoutLicense' | 'WithLicense';
+  licenseId?: number;
+  freshDatabase?: boolean;
+  certificateMode?: 'Default' | 'UserProvided';
+  siteHostName?: string;
+  sqlInstanceName?: string;
+  databaseName?: string;
+  certificateFile?: File | null;
+  combined?: boolean;
+  counterpartServerId?: number;
+  counterpartSiteHostName?: string;
+  /** The server reports its build stages under this ID (getDeploymentProgress) */
+  progressId?: string;
+  /** Off leaves the offline installers out (servers that already have the prerequisites). Default on. */
+  includeInstallers?: boolean;
+}
+
+function buildPackageForm(data: PackageRequest): FormData {
+  const form = new FormData();
+  form.append('applicationServerId', String(data.applicationServerId));
+  form.append('environment', data.environment);
+  form.append('buildId', String(data.buildId));
+  form.append('artifactName', data.artifactName);
+  form.append('licensingMode', data.licensingMode ?? 'WithoutLicense');
+  if (data.licenseId) form.append('licenseId', String(data.licenseId));
+  form.append('freshDatabase', data.freshDatabase ? 'true' : 'false');
+  form.append('certificateMode', data.certificateMode ?? 'Default');
+  if (data.siteHostName) form.append('siteHostName', data.siteHostName);
+  if (data.sqlInstanceName) form.append('sqlInstanceName', data.sqlInstanceName);
+  if (data.databaseName) form.append('databaseName', data.databaseName);
+  if (data.certificateFile) form.append('certificateFile', data.certificateFile);
+  form.append('combined', data.combined ? 'true' : 'false');
+  form.append('includeInstallers', data.includeInstallers === false ? 'false' : 'true');
+  if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
+  if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
+  if (data.progressId) form.append('progressId', data.progressId);
+  return form;
+}
+
 export interface DeploymentProgress {
   progressId: string;
   deploymentId: number;
@@ -983,17 +1055,7 @@ export const api = {
     return response.data;
   },
 
-  async deployAzureArtifact(data: {
-    applicationServerId: number;
-    environment: ArtifactEnvironment;
-    buildId: number;
-    artifactName: string;
-    version?: string;
-    progressId?: string;
-    // Omitted means WithoutLicense on the server, so an older caller deploys exactly as before
-    licensingMode?: 'WithoutLicense' | 'WithLicense';
-    licenseId?: number;
-  }): Promise<ApiDeploymentResult> {
+  async deployAzureArtifact(data: AzureArtifactDeployRequest): Promise<ApiDeploymentResult> {
     const response = await apiClient.post<ApiDeploymentResult>('/apideployments/azure-artifact', data);
     return response.data;
   },
@@ -1059,46 +1121,8 @@ export const api = {
     return response.data;
   },
 
-  async downloadDeploymentPackage(data: {
-    applicationServerId: number;
-    environment: ArtifactEnvironment;
-    buildId: number;
-    artifactName: string;
-    licensingMode?: 'WithoutLicense' | 'WithLicense';
-    licenseId?: number;
-    freshDatabase?: boolean;
-    certificateMode?: 'Default' | 'UserProvided';
-    siteHostName?: string;
-    sqlInstanceName?: string;
-    databaseName?: string;
-    certificateFile?: File | null;
-    combined?: boolean;
-    counterpartServerId?: number;
-    counterpartSiteHostName?: string;
-    /** The server reports its build stages under this ID (getDeploymentProgress) */
-    progressId?: string;
-    /** Off leaves the offline installers out (servers that already have the prerequisites). Default on. */
-    includeInstallers?: boolean;
-  }, onTransfer?: (loaded: number, total?: number) => void): Promise<{ blob: Blob; fileName: string }> {
-    const form = new FormData();
-    form.append('applicationServerId', String(data.applicationServerId));
-    form.append('environment', data.environment);
-    form.append('buildId', String(data.buildId));
-    form.append('artifactName', data.artifactName);
-    form.append('licensingMode', data.licensingMode ?? 'WithoutLicense');
-    if (data.licenseId) form.append('licenseId', String(data.licenseId));
-    form.append('freshDatabase', data.freshDatabase ? 'true' : 'false');
-    form.append('certificateMode', data.certificateMode ?? 'Default');
-    if (data.siteHostName) form.append('siteHostName', data.siteHostName);
-    if (data.sqlInstanceName) form.append('sqlInstanceName', data.sqlInstanceName);
-    if (data.databaseName) form.append('databaseName', data.databaseName);
-    if (data.certificateFile) form.append('certificateFile', data.certificateFile);
-    form.append('combined', data.combined ? 'true' : 'false');
-    form.append('includeInstallers', data.includeInstallers === false ? 'false' : 'true');
-    if (data.counterpartServerId) form.append('counterpartServerId', String(data.counterpartServerId));
-    if (data.counterpartSiteHostName) form.append('counterpartSiteHostName', data.counterpartSiteHostName);
-    if (data.progressId) form.append('progressId', data.progressId);
-    const response = await apiClient.post('/apideployments/azure-artifact/package', form, {
+  async downloadDeploymentPackage(data: PackageRequest, onTransfer?: (loaded: number, total?: number) => void): Promise<{ blob: Blob; fileName: string }> {
+    const response = await apiClient.post('/apideployments/azure-artifact/package', buildPackageForm(data), {
       responseType: 'blob',
       // Bytes of the finished zip arriving from the server (after the build stages)
       onDownloadProgress: onTransfer ? (event) => onTransfer(event.loaded, event.total ?? undefined) : undefined,
@@ -1106,6 +1130,32 @@ export const api = {
     const disposition = String(response.headers['content-disposition'] ?? '');
     const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
     return { blob: response.data as Blob, fileName: match ? decodeURIComponent(match[1]) : 'manual-deploy.zip' };
+  },
+
+  /**
+   * Starts a package build in the background and returns at once. Follow it with getDeploymentProgress(progressId)
+   * and getOperation(progressId); when it succeeds, download it from operationDownloadUrl(...).
+   */
+  async startPackageBuild(data: PackageRequest & { progressId: string }): Promise<string> {
+    const response = await apiClient.post<{ operationId: string }>('/apideployments/azure-artifact/package/start', buildPackageForm(data));
+    return response.data.operationId;
+  },
+
+  /** Starts an Azure DevOps deployment in the background (a closed tab or a proxy timeout cannot cancel it). */
+  async startAzureDeployment(data: AzureArtifactDeployRequest & { progressId: string }): Promise<string> {
+    const response = await apiClient.post<{ operationId: string }>('/apideployments/azure-artifact/start', data);
+    return response.data.operationId;
+  },
+
+  /** Status and result of a background deployment or package build. */
+  async getOperation(operationId: string): Promise<BackgroundOperation> {
+    const response = await apiClient.get<BackgroundOperation>(`/apideployments/operations/${encodeURIComponent(operationId)}`);
+    return response.data;
+  },
+
+  /** Plain link to a finished package (no login header needed; the token is the key). */
+  operationDownloadUrl(operationId: string, token: string): string {
+    return `${resolveApiBaseUrl()}/apideployments/operations/${encodeURIComponent(operationId)}/download?token=${encodeURIComponent(token)}`;
   },
 
   /** Live progress of an Azure DevOps deployment, or null until the API has started tracking it. */

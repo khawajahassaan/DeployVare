@@ -245,6 +245,8 @@ builder.Services.AddScoped<API.Services.Interfaces.ISqlServerSetupService, API.S
 builder.Services.AddScoped<API.Services.Interfaces.IFrontendRuntimeConfigService, API.Services.Implementations.FrontendRuntimeConfigService>();
 builder.Services.AddScoped<API.Services.Interfaces.IDatabaseMigrationService, API.Services.Implementations.DatabaseMigrationService>();
 builder.Services.AddSingleton<API.Services.Interfaces.IDeploymentProgressTracker, API.Services.Implementations.DeploymentProgressTracker>();
+// Long actions (deployments, package builds) run outside the request that started them
+builder.Services.AddSingleton<API.Services.IBackgroundOperations, API.Services.BackgroundOperations>();
 builder.Services.AddScoped<API.Services.Interfaces.IManualPackageService, API.Services.Implementations.ManualPackageService>();
 
 // Licensing: the signing key lives outside the application folder, so only this installation can issue licences

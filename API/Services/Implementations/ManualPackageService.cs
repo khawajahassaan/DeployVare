@@ -698,7 +698,16 @@ public class ManualPackageService : IManualPackageService
 
     private static async Task<string> SaveCertificateAsync(DownloadArtifactPackageRequest request, CancellationToken cancellationToken)
     {
-        var file = request.CertificateFile
+        // Saved already by the request that started a background build
+        if (!string.IsNullOrEmpty(request.CertificateTempPath) && File.Exists(request.CertificateTempPath))
+            return request.CertificateTempPath;
+        return await SaveCertificateFileAsync(request.CertificateFile, cancellationToken);
+    }
+
+    /// <summary>Validates an uploaded .pfx / .p12 and copies it to a temporary file.</summary>
+    public static async Task<string> SaveCertificateFileAsync(IFormFile? certificateFile, CancellationToken cancellationToken)
+    {
+        var file = certificateFile
             ?? throw new InvalidOperationException("Upload a .pfx certificate, or choose the default certificate option.");
         if (file.Length == 0)
             throw new InvalidOperationException("The certificate file is empty.");

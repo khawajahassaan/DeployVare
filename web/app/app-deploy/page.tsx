@@ -16,12 +16,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DeploymentStepsPanel } from '@/components/DeploymentStepsPanel';
 import { getDeploymentSteps } from '@/lib/deploymentSteps';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import api, {
   ApplicationServer,
   ApiDeploymentResult,
   ArtifactEnvironment,
   DeploymentProgress,
   DeploymentStageState,
+  BackgroundOperation,
   InstallerFile,
   LatestBuildResult,
   License,
@@ -80,6 +82,24 @@ const AZURE_DEPLOY_STEPS = [
   'Start IIS services',
   'Verify deployment',
 ];
+
+// Follows a background operation (deployment / package build) until it finishes. A failed poll (a network blip,
+// a proxy hiccup) is retried: the operation keeps running on the server either way.
+const waitForOperation = async (operationId: string, intervalMs = 2000): Promise<BackgroundOperation> => {
+  let failures = 0;
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    try {
+      const operation = await api.getOperation(operationId);
+      failures = 0;
+      if (operation.status !== 'Running') return operation;
+    } catch (err) {
+      // Unknown operation: the API restarted and lost it
+      if ((err as { response?: { status?: number } }).response?.status === 404) throw new Error('The server no longer knows this operation (it may have restarted). Check the deployment history, then try again.');
+      if (++failures >= 30) throw err;
+    }
+  }
+};
 
 const newProgressId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -424,16 +444,20 @@ export default function AppDeployPage() {
     try {
       let result: ApiDeploymentResult;
       if (deploySource === 'azure') {
-        result = await api.deployAzureArtifact({
+        // Runs on the server in the background: a closed tab or a proxy timeout cannot cut it off half-way
+        await api.startAzureDeployment({
           applicationServerId: selectedServerId,
           environment,
           buildId: latestBuild!.build.id,
           artifactName: selectedArtifact,
           version: version || undefined,
-          progressId: progressId ?? undefined,
+          progressId: progressId!,
           licensingMode,
           licenseId: licensingMode === 'WithLicense' ? licenseId : undefined,
         });
+        const operation = await waitForOperation(progressId!);
+        if (operation.status === 'Failed') throw new Error(operation.error || 'Deployment failed');
+        result = operation.result as ApiDeploymentResult;
       } else if (isFrontend) {
         result = await api.deployFrontend(selectedServerId, zipFile!, version || undefined);
       } else {
@@ -534,7 +558,7 @@ export default function AppDeployPage() {
     const packagePollTimer = setInterval(pollPackage, 1500);
 
     try {
-      const { blob, fileName } = await api.downloadDeploymentPackage({
+      await api.startPackageBuild({
         applicationServerId: selectedServerId,
         environment,
         buildId: latestBuild.build.id,
@@ -550,17 +574,25 @@ export default function AppDeployPage() {
         counterpartSiteHostName: packageKind === 'combined' ? counterpartSiteHostName.trim() : undefined,
         progressId: packageProgressId,
         includeInstallers,
-      }, (loaded, total) => setPackageTransfer((previous) => ({ loaded, total, startedAt: previous?.startedAt ?? Date.now() })));
+      });
 
-      const url = window.URL.createObjectURL(blob);
+      // Built in the background; then a plain link downloads it straight to disk (resumable, not held in memory)
+      const operation = await waitForOperation(packageProgressId, 1500);
+      if (operation.status === 'Failed' || !operation.downloadToken) throw new Error(operation.error || 'Failed to build the package');
+      const url = api.operationDownloadUrl(packageProgressId, operation.downloadToken);
       const link = document.createElement('a');
       link.href = url;
-      link.download = fileName;
+      link.download = operation.fileName ?? 'manual-deploy.zip';
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
       setPackageDialogOpen(false);
+      const size = operation.fileSizeBytes ? ` (${formatFileSize(operation.fileSizeBytes)})` : '';
+      toast.success(`Downloading ${operation.fileName}${size}`, {
+        description: 'Your browser saves it directly; the link stays valid for 2 hours.',
+        duration: 15000,
+        action: { label: 'Download again', onClick: () => window.open(url, '_blank') },
+      });
     } catch (err) {
       const data = (err as { response?: { data?: unknown } }).response?.data;
       let message = (err as RequestError).message ?? 'Failed to build the package';

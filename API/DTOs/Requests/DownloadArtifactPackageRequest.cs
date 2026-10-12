@@ -49,6 +49,13 @@ public class DownloadArtifactPackageRequest
     public IFormFile? CertificateFile { get; set; }
 
     /// <summary>
+    /// Set by the server, never bound from the form: a background build cannot read the upload after the request has
+    /// ended, so the .pfx is saved to this temporary file first.
+    /// </summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public string? CertificateTempPath { get; set; }
+
+    /// <summary>
     /// When true, the download is one zip with both the API kit and the frontend kit.
     /// This-server-only packages stay unchanged when the field is omitted.
     /// </summary>
