@@ -283,6 +283,27 @@ public class AzureDevOpsConfigService : IAzureDevOpsConfigService
         return new ArtifactDeploymentContext(server, source, credentials);
     }
 
+    public async Task<(ArtifactSource Source, AzureDevOpsCredentials Credentials)> ResolveSourceAsync(int applicationId,
+        ServerType serverType, ArtifactEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        var source = await _context.ArtifactSources
+            .Include(s => s.Application)
+            .FirstOrDefaultAsync(s => s.ApplicationId == applicationId
+                && s.Environment == environment
+                && s.ServerType == serverType, cancellationToken);
+        if (source == null)
+        {
+            var name = await _context.Applications.Where(a => a.Id == applicationId).Select(a => a.Name)
+                .FirstOrDefaultAsync(cancellationToken)
+                ?? throw new AzureDevOpsException(AzureDevOpsErrorCode.InvalidConfiguration, "Application not found.");
+            throw new AzureDevOpsException(AzureDevOpsErrorCode.InvalidConfiguration,
+                $"No Azure DevOps artifact source is configured for {name} ({environment}, {serverType}). Add one on the Azure DevOps page.");
+        }
+
+        var credentials = await GetClientCredentialsAsync(source.Application.ClientId, cancellationToken);
+        return (source, credentials);
+    }
+
     private async Task<AzureDevOpsCredentials> GetClientCredentialsAsync(int clientId, CancellationToken cancellationToken)
     {
         var connection = await _context.AzureDevOpsConnections

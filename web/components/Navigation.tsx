@@ -22,6 +22,7 @@ import {
   Users,
   Settings,
   ShieldCheck,
+  Terminal,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useClientStore } from '@/store/clientStore';
@@ -67,6 +68,12 @@ const navGroups: NavGroup[] = [
       { name: 'Azure DevOps', href: '/azure-devops', icon: Cloud, requiredPermission: 'ManageAzureDevOps' },
       { name: 'Deploy App', href: '/app-deploy', icon: Upload, requiredPermission: 'DeployApi', matches: ['/api-deploy'] },
       { name: 'App History', href: '/app-history', icon: FileCode, requiredPermission: 'ViewApiHistory', matches: ['/api-history'] },
+    ],
+  },
+  {
+    label: 'Linux',
+    items: [
+      { name: 'Linux Deployment', href: '/linux-deploy', icon: Terminal, requiredPermission: 'DeployApi' },
     ],
   },
   {

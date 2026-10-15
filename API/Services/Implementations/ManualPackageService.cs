@@ -443,6 +443,20 @@ public class ManualPackageService : IManualPackageService
             var keepPaths = KeepOnServerPaths.Parse(source.KeepOnServerPaths);
             var sqlInstance = string.IsNullOrWhiteSpace(request.SqlInstanceName) ? "SQLEXPRESS" : request.SqlInstanceName.Trim();
 
+            // Pipelines often leave appsettings.json out of the artifact; the backend kit always carries one to edit.
+            // A generated template is only a starting point, so a server that already has its own file keeps it.
+            AppSettingsTemplate.Result? appSettings = null;
+            if (!isFrontend)
+            {
+                appSettings = AppSettingsTemplate.Ensure(package.ContentDirectory,
+                    AppSettingsTemplate.WindowsConnectionString(sqlDataSource ?? $@".\{sqlInstance}", databaseName, sqlLogin: separateDatabase));
+                if (appSettings.Generated && !keepPaths.Contains(AppSettingsTemplate.FileName, StringComparer.OrdinalIgnoreCase))
+                    keepPaths.Add(AppSettingsTemplate.FileName);
+                if (appSettings.Generated)
+                    _logger.LogInformation("ManualPackage generated appsettings.json for {ServerName} (based on {BasedOn})",
+                        server.ServerName, appSettings.BasedOn ?? "minimal template");
+            }
+
             var config = new ManualDeployConfig
             {
                 ServerName = server.ServerName,
@@ -477,6 +491,8 @@ public class ManualPackageService : IManualPackageService
             };
 
             var readme = ManualPackageBuilder.BuildReadme(config, build.BuildNumber, keepPaths);
+            if (appSettings != null)
+                readme += Environment.NewLine + ManualPackageBuilder.BuildAppSettingsReadme(appSettings.Generated, appSettings.BasedOn);
             if (request.PackageSetId != null)
             {
                 // A kit of a two- or three-tier download: it can also deploy every tier on one machine

@@ -30,4 +30,11 @@ public interface IAzureDevOpsConfigService
 
     Task<ArtifactDeploymentContext> ResolveDeploymentContextAsync(int applicationServerId, ArtifactEnvironment environment,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Artifact source and credentials for an application's backend or frontend, without a registered server
+    /// (Linux deployments connect to servers entered on the page).
+    /// </summary>
+    Task<(ArtifactSource Source, AzureDevOpsCredentials Credentials)> ResolveSourceAsync(int applicationId, ServerType serverType,
+        ArtifactEnvironment environment, CancellationToken cancellationToken = default);
 }

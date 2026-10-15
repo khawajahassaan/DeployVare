@@ -411,6 +411,103 @@ function buildPackageForm(data: PackageRequest): FormData {
   return form;
 }
 
+// Linux deployment
+export type LinuxDeploymentTarget = 'Frontend' | 'Backend' | 'TwoTier' | 'ThreeTier';
+
+/** SSH login to a Linux server; sent with the request only, never stored. */
+export interface LinuxSshTarget {
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  privateKey?: string;
+  sudoPassword?: string;
+}
+
+export interface LinuxPackageRequest {
+  applicationId: number;
+  environment: ArtifactEnvironment;
+  target: LinuxDeploymentTarget;
+  apiBuildId?: number;
+  apiArtifactName?: string;
+  frontendBuildId?: number;
+  frontendArtifactName?: string;
+  apiHostName?: string;
+  frontendHostName?: string;
+  apiDeploymentPath?: string;
+  frontendDeploymentPath?: string;
+  serviceName?: string;
+  apiPort?: number;
+  webServer?: 'nginx' | 'apache';
+  apiCertificatePath?: string;
+  apiCertificateKeyPath?: string;
+  frontendCertificatePath?: string;
+  frontendCertificateKeyPath?: string;
+  proxyApiThroughFrontend?: boolean;
+  apiProxyPath?: string;
+  apiProxyUpstream?: string;
+  frontendApiUrl?: string;
+  installRedis?: boolean;
+  runMigrations?: boolean;
+  databaseServer?: string;
+  databaseName?: string;
+  databaseUser?: string;
+  progressId?: string;
+}
+
+export interface LinuxDeployRequest extends LinuxPackageRequest {
+  apiServer?: LinuxSshTarget;
+  frontendServer?: LinuxSshTarget;
+  databasePassword?: string;
+}
+
+export interface LinuxBuildOption {
+  serverType: 'Api' | 'Frontend';
+  build?: AzureBuild | null;
+  configuredArtifactName?: string | null;
+  suggestedArtifactName?: string | null;
+  suggestedIsLinuxSpecific: boolean;
+  note?: string | null;
+  error?: string | null;
+  runDatabaseMigrations: boolean;
+}
+
+export interface LinuxBuilds {
+  applicationName: string;
+  slug: string;
+  api: LinuxBuildOption;
+  frontend: LinuxBuildOption;
+}
+
+export interface LinuxConnectionTest {
+  success: boolean;
+  message: string;
+  os?: string | null;
+  supportedOs: boolean;
+  sudoWorks?: boolean | null;
+  dotNetRuntimes?: string | null;
+  nginxInstalled?: boolean | null;
+  apacheInstalled?: boolean | null;
+  diskFreeMb?: number | null;
+}
+
+export interface LinuxDeploymentKitResult {
+  tier: string;
+  host: string;
+  buildNumber: string;
+  artifactName: string;
+  succeeded: boolean;
+  output: string[];
+}
+
+export interface LinuxDeploymentResult {
+  succeeded: boolean;
+  message: string;
+  kits: LinuxDeploymentKitResult[];
+  startedAt: string;
+  completedAt: string;
+}
+
 export interface DeploymentProgress {
   progressId: string;
   deploymentId: number;
@@ -1174,6 +1271,30 @@ export const api = {
   async getDeploymentProgress(progressId: string): Promise<DeploymentProgress | null> {
     const response = await apiClient.get<DeploymentProgress | ''>(`/apideployments/progress/${encodeURIComponent(progressId)}`);
     return response.data || null;
+  },
+
+  // Linux Deployment
+  /** Latest backend and frontend builds of an application and the Linux artifact each would use. */
+  async getLinuxBuilds(applicationId: number, environment: ArtifactEnvironment): Promise<LinuxBuilds> {
+    const response = await apiClient.get<LinuxBuilds>('/linuxdeployment/builds', { params: { applicationId, environment } });
+    return response.data;
+  },
+
+  async testLinuxConnection(target: LinuxSshTarget): Promise<LinuxConnectionTest> {
+    const response = await apiClient.post<LinuxConnectionTest>('/linuxdeployment/test-connection', target);
+    return response.data;
+  },
+
+  /** Starts building the .tar.gz kits in the background; follow with getDeploymentProgress / getOperation. */
+  async startLinuxPackage(data: LinuxPackageRequest & { progressId: string }): Promise<string> {
+    const response = await apiClient.post<{ operationId: string }>('/linuxdeployment/package/start', data);
+    return response.data.operationId;
+  },
+
+  /** Starts a one-click Linux deployment in the background (SFTP upload + Deploy.sh on each server). */
+  async startLinuxDeployment(data: LinuxDeployRequest & { progressId: string }): Promise<string> {
+    const response = await apiClient.post<{ operationId: string }>('/linuxdeployment/deploy/start', data);
+    return response.data.operationId;
   },
 
   // Server Setup

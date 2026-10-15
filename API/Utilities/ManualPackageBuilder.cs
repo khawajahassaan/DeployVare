@@ -213,6 +213,33 @@ public static class ManualPackageBuilder
         return text.ToString();
     }
 
+    /// <summary>README section about the backend's app\appsettings.json.</summary>
+    public static string BuildAppSettingsReadme(bool generated, string? basedOn)
+    {
+        var text = new StringBuilder();
+        text.AppendLine("APPSETTINGS.JSON");
+        text.AppendLine();
+        if (generated)
+        {
+            text.AppendLine("The build has no appsettings.json, so DeployVare added a template at app\\appsettings.json");
+            text.AppendLine(basedOn == null
+                ? "(a minimal layout: add any other settings the application needs)."
+                : $"(based on {basedOn} from the build).");
+            text.AppendLine("Before running Deploy.ps1, open it in a text editor and set ConnectionStrings: replace every");
+            text.AppendLine("<...> value with the real server, database and login.");
+            text.AppendLine();
+            text.AppendLine("When the server already has an appsettings.json, Deploy.ps1 keeps the server's file and this");
+            text.AppendLine("template is not copied. Delete the server's file first to replace it.");
+        }
+        else
+        {
+            text.AppendLine("app\\appsettings.json is the file from the build. Check its ConnectionStrings before running");
+            text.AppendLine("Deploy.ps1; it replaces the server's file unless appsettings.json is a kept-on-server path.");
+        }
+        text.AppendLine();
+        return text.ToString();
+    }
+
     /// <summary>Instructions for whoever copies the files to the server by hand.</summary>
     public static string BuildReadme(
         string serverName,

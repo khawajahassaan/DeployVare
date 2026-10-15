@@ -1,641 +1,706 @@
-#!/bin/bash
-# DeployVare offline manual deployment for Linux (Ubuntu/Debian)
-# Run with: sudo bash Deploy.sh
-# Reads deploy-config.json. Does not call DeployVare or Azure DevOps. Does not print secrets.
+#!/usr/bin/env bash
+# DeployVare Linux deployment kit (Ubuntu / Debian).
+#
+# Run it from the extracted kit folder as root:
+#     sudo bash Deploy.sh
+#
+# The kit type comes from deploy-config.json next to this script:
+#   Api       .NET backend: Kestrel as a systemd service behind Nginx/Apache (installs .NET and Redis when missing)
+#   Frontend  static frontend files served by Nginx/Apache (SPA fallback to index.html, optional /api route)
+#   Database  runs DbMigrator with the kit's SQL scripts against an existing SQL Server database
+#
+# Options:
+#   --yes, -y           do not ask anything (used by DeployVare's one-click deployment)
+#   --run-migrations    run DbMigrator even when the kit does not do so by default
+#   --skip-migrations   never run DbMigrator
+#
+# Reads only deploy-config.json and the kit's files. Never prints passwords. A full log is written to deployment.log.
 
-set -euo pipefail
+set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACKAGE_ROOT="$(dirname "$SCRIPT_DIR")"
-CONFIG_PATH="$PACKAGE_ROOT/deploy-config.json"
-LOG_FILE="$PACKAGE_ROOT/deployment.log"
+KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG="$KIT_DIR/deploy-config.json"
+LOG_FILE="$KIT_DIR/deployment.log"
+ASSUME_YES=false
+MIGRATIONS_OVERRIDE=""
+BACKUP_FILE=""
+APT_UPDATED=false
 
-# Arrays to track steps
-declare -a STEP_LOGS=()
-SITE_STOPPED=false
-REDIS_SERVICE=""
+usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+for arg in "$@"; do
+    case "$arg" in
+        --yes|-y) ASSUME_YES=true ;;
+        --run-migrations) MIGRATIONS_OVERRIDE=true ;;
+        --skip-migrations) MIGRATIONS_OVERRIDE=false ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $arg (see --help)"; exit 2 ;;
+    esac
+done
 
-# ---- Utility Functions ----
-write_step() {
-    local msg="$1"
-    echo -e "${GREEN}[$(date +'%H:%M:%S')]${NC} $msg"
-    STEP_LOGS+=("$msg")
-}
+# ---- Output -----------------------------------------------------------------------------------------------------
 
-write_error() {
-    local msg="$1"
-    echo -e "${RED}[$(date +'%H:%M:%S')] ERROR: $msg${NC}"
-    STEP_LOGS+=("FAILED: $msg")
-}
-
-write_info() {
-    local msg="$1"
-    echo "[$(date +'%H:%M:%S')] $msg"
-    STEP_LOGS+=("$msg")
-}
+step() { echo "==> $*"; }
+ok()   { echo "[OK] $*"; }
+info() { echo "    $*"; }
+warn() { echo "[WARN] $*"; }
 
 fail() {
-    local msg="$1"
-    write_error "$msg"
-
-    # Attempt to restore service state
-    if [ "$SITE_STOPPED" = true ] && [ -n "$REDIS_SERVICE" ]; then
-        write_info "Attempting to restart $REDIS_SERVICE after failure..."
-        sudo systemctl start "$REDIS_SERVICE" 2>/dev/null || true
+    echo "[FAILED] $*"
+    if [[ -n "$BACKUP_FILE" ]]; then
+        echo "         The previous version is saved in $BACKUP_FILE"
+        echo "         Restore it with: sudo tar -xzf '$BACKUP_FILE' -C '$(dirname "$DEPLOY_PATH")'"
     fi
-
-    # Save log
-    {
-        printf '%s\n' "${STEP_LOGS[@]}"
-    } >> "$LOG_FILE"
-
     exit 1
 }
 
-assert_root() {
-    if [[ $EUID -ne 0 ]]; then
-        fail "This script must be run as root (use: sudo bash Deploy.sh)"
-    fi
+trap 'echo "[FAILED] Unexpected error on line $LINENO: $BASH_COMMAND"' ERR
+
+confirm() {
+    [[ "$ASSUME_YES" == true ]] && return 0
+    local answer
+    read -r -p "$1 [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]]
 }
+
+# ---- Prerequisites ----------------------------------------------------------------------------------------------
+
+assert_environment() {
+    [[ $EUID -eq 0 ]] || { echo "Run this script as root: sudo bash Deploy.sh"; exit 1; }
+    command -v apt-get >/dev/null 2>&1 || { echo "This kit supports Ubuntu and Debian (apt-get was not found)."; exit 1; }
+    command -v systemctl >/dev/null 2>&1 || { echo "systemd is required (systemctl was not found)."; exit 1; }
+    [[ -f "$CONFIG" ]] || { echo "deploy-config.json was not found next to Deploy.sh. Run the script from the extracted kit folder."; exit 1; }
+}
+
+apt_install() {
+    local missing=() package
+    for package in "$@"; do
+        dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package")
+    done
+    [[ ${#missing[@]} -eq 0 ]] && return 0
+    if [[ "$APT_UPDATED" == false ]]; then
+        step "Updating the package lists (apt-get update)"
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        APT_UPDATED=true
+    fi
+    step "Installing ${missing[*]}"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
+}
+
+# ---- Configuration ----------------------------------------------------------------------------------------------
+
+cfg() { jq -r "$1 // empty" "$CONFIG"; }
 
 read_config() {
-    if [[ ! -f "$CONFIG_PATH" ]]; then
-        fail "deploy-config.json not found at $CONFIG_PATH"
-    fi
+    apt_install jq ca-certificates curl tar
 
-    # Parse JSON using jq or fall back to basic grep
-    if ! command -v jq &> /dev/null; then
-        write_info "jq not found; installing..."
-        apt-get update -qq && apt-get install -y jq > /dev/null
-    fi
+    KIT_TYPE=$(cfg .kitType)
+    APP_NAME=$(cfg .applicationName)
+    BUILD_NUMBER=$(cfg .buildNumber)
+    SITE_NAME=$(cfg .siteName)
+    SITE_HOST=$(cfg .siteHostName)
+    DEPLOY_PATH=$(cfg .deploymentPath)
+    WEB_SERVER=$(cfg .webServer); WEB_SERVER=${WEB_SERVER:-nginx}
+    CERT_PATH=$(cfg .certificatePath)
+    CERT_KEY_PATH=$(cfg .certificateKeyPath)
+    SERVICE_NAME=$(cfg .serviceName)
+    SERVICE_USER=$(cfg .serviceUser); SERVICE_USER=${SERVICE_USER:-www-data}
+    APP_ENTRY=$(cfg .appEntry)
+    SELF_CONTAINED=$(jq -r '.selfContained // false' "$CONFIG")
+    APP_PORT=$(jq -r '.appPort // 5000' "$CONFIG")
+    DOTNET_MAJOR=$(jq -r '.requiredDotNetMajor // 10' "$CONFIG")
+    INSTALL_REDIS=$(jq -r '.installRedis // false' "$CONFIG")
+    REDIS_PORT=$(jq -r '.redisPort // 6379' "$CONFIG")
+    APPSETTINGS_GENERATED=$(jq -r '.appSettingsGenerated // false' "$CONFIG")
+    API_PROXY_PATH=$(cfg .apiProxyPath)
+    API_PROXY_UPSTREAM=$(cfg .apiProxyUpstream)
+    RUN_MIGRATIONS=$(jq -r '.runMigrations // false' "$CONFIG")
+    HAS_SCRIPTS=$(jq -r '.hasScripts // false' "$CONFIG")
+    DBMIGRATOR_FOLDER=$(cfg .dbMigratorFolder); DBMIGRATOR_FOLDER=${DBMIGRATOR_FOLDER:-dbmigrator}
+    BACKUP_PATH=$(cfg .backupPath); BACKUP_PATH=${BACKUP_PATH:-/var/backups/deployvare}
+    mapfile -t KEEP_PATHS < <(jq -r '.keepOnServerPaths[]? // empty' "$CONFIG")
 
-    # Export config values as variables
-    export SERVER_NAME=$(jq -r '.serverName // empty' "$CONFIG_PATH")
-    export SERVER_TYPE=$(jq -r '.serverType // empty' "$CONFIG_PATH")
-    export WEB_SERVER=$(jq -r '.webServer // "nginx"' "$CONFIG_PATH")
-    export DEPLOYMENT_PATH=$(jq -r '.deploymentPath // empty' "$CONFIG_PATH")
-    export SITE_NAME=$(jq -r '.siteName // empty' "$CONFIG_PATH")
-    export SITE_HOST_NAME=$(jq -r '.siteHostName // empty' "$CONFIG_PATH")
-    export HTTPS_PORT=$(jq -r '.httpsPort // 443' "$CONFIG_PATH")
-    export CERTIFICATE_FILE=$(jq -r '.certificateFile // empty' "$CONFIG_PATH")
-    export CERTIFICATE_KEY_FILE=$(jq -r '.certificateKeyFile // empty' "$CONFIG_PATH")
-    export SQL_DATA_SOURCE=$(jq -r '.sqlDataSource // empty' "$CONFIG_PATH")
-    export SQL_DATABASE=$(jq -r '.databaseName // empty' "$CONFIG_PATH")
-    export FRESH_DATABASE=$(jq -r '.freshDatabase // false' "$CONFIG_PATH")
-    export REQUIRED_DOTNET_MAJOR=$(jq -r '.requiredDotNetMajor // 8' "$CONFIG_PATH")
-    export REQUIRED_REDIS_MAJOR=$(jq -r '.requiredRedisMajor // 7' "$CONFIG_PATH")
-    export REDIS_PORT=$(jq -r '.redisPort // 6379' "$CONFIG_PATH")
+    [[ -n "$MIGRATIONS_OVERRIDE" ]] && RUN_MIGRATIONS=$MIGRATIONS_OVERRIDE
+    [[ "$KIT_TYPE" == "Database" && -z "$MIGRATIONS_OVERRIDE" ]] && RUN_MIGRATIONS=true
 
-    # Validate required fields
-    [[ -n "$SERVER_NAME" ]] || fail "serverName missing from deploy-config.json"
-    [[ -n "$SERVER_TYPE" ]] || fail "serverType missing from deploy-config.json"
-    [[ -n "$DEPLOYMENT_PATH" ]] || fail "deploymentPath missing from deploy-config.json"
-    [[ -n "$SITE_NAME" ]] || fail "siteName missing from deploy-config.json"
-    [[ -n "$SITE_HOST_NAME" ]] || fail "siteHostName missing from deploy-config.json"
-
-    # Validate path (must be absolute and safe)
-    if [[ ! "$DEPLOYMENT_PATH" =~ ^/ ]]; then
-        fail "deploymentPath must be an absolute path (starting with /): $DEPLOYMENT_PATH"
-    fi
-    if [[ "$DEPLOYMENT_PATH" =~ \.\. ]]; then
-        fail "deploymentPath must not contain .."
-    fi
-
-    write_step "Configuration loaded from deploy-config.json"
+    validate_config
 }
 
-installer_path() {
-    local pattern="$1"
-    local dir="$PACKAGE_ROOT/installers"
-    if [[ ! -d "$dir" ]]; then
-        echo ""
-        return
-    fi
-    # Return most recent matching file
-    find "$dir" -maxdepth 1 -name "$pattern" -type f -printf '%T@ %p\n' 2>/dev/null | \
-        sort -rn | head -1 | cut -d' ' -f2- || echo ""
+validate_name() { [[ "$2" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$ ]] || fail "$1 '$2' may only contain letters, digits, '.', '_' and '-'."; }
+
+validate_absolute_path() {
+    local label="$1" path="$2"
+    [[ "$path" == /* ]] || fail "$label must be an absolute path (starting with /): $path"
+    [[ "$path" != *..* && "$path" != *"//"* && "$path" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "$label contains unsupported characters: $path"
 }
 
-# ---- System Checks ----
-ensure_root_writable_tmp() {
-    # Ensure /tmp is writable (needed for builds, extracts, etc.)
-    if ! touch /tmp/.write_test 2>/dev/null; then
-        fail "/tmp is not writable; cannot proceed"
+validate_config() {
+    case "$KIT_TYPE" in Api|Frontend|Database) ;; *) fail "kitType must be Api, Frontend or Database (found '$KIT_TYPE')." ;; esac
+    case "$WEB_SERVER" in nginx|apache) ;; *) fail "webServer must be nginx or apache (found '$WEB_SERVER')." ;; esac
+    validate_absolute_path "backupPath" "$BACKUP_PATH"
+    [[ "$KIT_TYPE" == "Database" ]] && return 0
+
+    validate_name "siteName" "$SITE_NAME"
+    validate_absolute_path "deploymentPath" "$DEPLOY_PATH"
+    case "${DEPLOY_PATH%/}" in
+        ""|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|/var/www|/var/lib|/var/log)
+            fail "deploymentPath '$DEPLOY_PATH' is a system folder. Use a folder of its own, e.g. /var/www/$SITE_NAME." ;;
+    esac
+    if [[ -n "$SITE_HOST" && ! "$SITE_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$ ]]; then
+        fail "siteHostName '$SITE_HOST' must be a host name or IP address (no http:// or path)."
     fi
-    rm -f /tmp/.write_test
-    write_step "[OK] /tmp is writable"
+    [[ "$KIT_TYPE" == "Frontend" && -z "$SITE_HOST" ]] && fail "siteHostName is required for a frontend kit (a domain name or the server's IP)."
+    if [[ -n "$CERT_PATH" || -n "$CERT_KEY_PATH" ]]; then
+        [[ -n "$CERT_PATH" && -n "$CERT_KEY_PATH" ]] || fail "Set both certificatePath and certificateKeyPath, or neither (HTTP only)."
+        [[ -f "$CERT_PATH" ]] || fail "Certificate not found on this server: $CERT_PATH"
+        [[ -f "$CERT_KEY_PATH" ]] || fail "Certificate key not found on this server: $CERT_KEY_PATH"
+    fi
+
+    if [[ "$KIT_TYPE" == "Api" ]]; then
+        validate_name "serviceName" "$SERVICE_NAME"
+        validate_name "serviceUser" "$SERVICE_USER"
+        [[ -n "$APP_ENTRY" && "$APP_ENTRY" != */* ]] || fail "appEntry must be the file name of the application (e.g. MyApp.dll)."
+        [[ "$APP_PORT" =~ ^[0-9]+$ && "$APP_PORT" -ge 1024 && "$APP_PORT" -le 65535 ]] || fail "appPort must be between 1024 and 65535."
+        [[ -f "$KIT_DIR/app/$APP_ENTRY" ]] || fail "app/$APP_ENTRY is missing from the kit."
+    fi
+    if [[ "$KIT_TYPE" == "Frontend" && -n "$API_PROXY_UPSTREAM" ]]; then
+        # POSIX bracket expression: a literal ] must come first ([] also allows IPv6 such as http://[::1]:5000)
+        local upstream_pattern='^https?://[][A-Za-z0-9.:-]+/?$'
+        [[ "$API_PROXY_UPSTREAM" =~ $upstream_pattern ]] || fail "apiProxyUpstream must look like http://127.0.0.1:5000"
+        [[ "${API_PROXY_PATH:-/api}" =~ ^/[A-Za-z0-9._/-]*$ ]] || fail "apiProxyPath must start with / (e.g. /api)."
+    fi
+    [[ "$KIT_TYPE" == "Database" || -d "$KIT_DIR/app" ]] || fail "The kit has no app/ folder."
 }
 
-ensure_dependencies() {
-    write_step "Installing system dependencies..."
-    apt-get update -qq
-    apt-get install -y --no-install-recommends \
-        curl wget gpg systemctl openssh-client ca-certificates \
-        > /dev/null 2>&1
-    write_step "[OK] System dependencies installed"
+show_plan() {
+    echo
+    echo "DeployVare Linux deployment: $APP_NAME build #$BUILD_NUMBER ($KIT_TYPE kit)"
+    case "$KIT_TYPE" in
+        Api)
+            echo "  Files:        $DEPLOY_PATH"
+            echo "  Service:      $SERVICE_NAME (systemd, user $SERVICE_USER, http://127.0.0.1:$APP_PORT)"
+            echo "  Start:        $([[ "$SELF_CONTAINED" == true ]] && echo "$APP_ENTRY (self-contained)" || echo "dotnet $APP_ENTRY (.NET $DOTNET_MAJOR)")"
+            echo "  Web server:   $([[ -n "$SITE_HOST" ]] && echo "$WEB_SERVER site '$SITE_NAME' for $SITE_HOST" || echo "none (reached through the frontend's API route)")"
+            echo "  Redis:        $([[ "$INSTALL_REDIS" == true ]] && echo "installed when missing (port $REDIS_PORT)" || echo "not managed")"
+            echo "  Migrations:   $([[ "$RUN_MIGRATIONS" == true ]] && echo "DbMigrator runs after the files are copied" || echo "not run")"
+            ;;
+        Frontend)
+            echo "  Files:        $DEPLOY_PATH"
+            echo "  Web server:   $WEB_SERVER site '$SITE_NAME' for $SITE_HOST"
+            [[ -n "$API_PROXY_UPSTREAM" ]] && echo "  API route:    ${API_PROXY_PATH:-/api} -> $API_PROXY_UPSTREAM"
+            ;;
+        Database)
+            echo "  DbMigrator:   $DBMIGRATOR_FOLDER/DbMigrator.dll with sqlscripts/"
+            echo "  Connection:   ConnectionStrings in appsettings.json next to this script"
+            ;;
+    esac
+    [[ "$KIT_TYPE" != "Database" ]] && echo "  HTTPS:        $([[ -n "$CERT_PATH" ]] && echo "$CERT_PATH" || echo "not configured (HTTP only)")"
+    echo
+    confirm "Continue?" || { echo "Cancelled. Nothing was changed."; exit 0; }
 }
+
+# ---- Server components ------------------------------------------------------------------------------------------
 
 ensure_dotnet() {
-    if [[ "$SERVER_TYPE" != "Api" ]]; then return; fi
-
-    local major=$REQUIRED_DOTNET_MAJOR
-    write_step "Checking .NET $major runtime..."
-
-    if ! command -v dotnet &> /dev/null; then
-        write_step "Installing .NET $major SDK and Runtime..."
-
-        # Add Microsoft package repository
-        wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb \
-            -O packages-microsoft-prod.deb
-        dpkg -i packages-microsoft-prod.deb > /dev/null 2>&1
-        rm packages-microsoft-prod.deb
-
-        apt-get update -qq
-        apt-get install -y dotnet-sdk-$major dotnet-runtime-$major > /dev/null 2>&1
+    [[ "$KIT_TYPE" == "Frontend" ]] && return 0
+    if [[ "$KIT_TYPE" == "Api" && "$SELF_CONTAINED" == true ]]; then
+        ok "Self-contained build: no .NET runtime needed"
+        return 0
     fi
 
-    # Verify installation
-    local installed_version=$(dotnet --version 2>/dev/null | cut -d'.' -f1)
-    if [[ "$installed_version" != "$major" ]]; then
-        fail ".NET $major not installed; found version: $installed_version"
+    local framework="Microsoft.AspNetCore.App"
+    [[ "$KIT_TYPE" == "Database" ]] && framework="Microsoft.NETCore.App"
+    if command -v dotnet >/dev/null 2>&1 && dotnet --list-runtimes 2>/dev/null | grep -q "^$framework $DOTNET_MAJOR\."; then
+        ok ".NET $DOTNET_MAJOR runtime ($framework) is installed"
+        return 0
     fi
 
-    write_step "[OK] .NET $major"
+    step "Installing the ASP.NET Core $DOTNET_MAJOR runtime"
+    # .NET needs ICU; the package name carries the version (libicu70, libicu74, ...)
+    local icu
+    icu=$(apt-cache pkgnames libicu 2>/dev/null | grep -E '^libicu[0-9]+$' | sort -V | tail -1 || true)
+    apt_install ${icu:+"$icu"} libssl3 2>/dev/null || apt_install ${icu:+"$icu"}
+
+    # Into the existing .NET folder when there is one, so other applications keep working
+    local root=/usr/share/dotnet
+    if command -v dotnet >/dev/null 2>&1; then root=$(dirname "$(readlink -f "$(command -v dotnet)")"); fi
+    curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+    bash /tmp/dotnet-install.sh --channel "$DOTNET_MAJOR.0" --runtime aspnetcore --install-dir "$root" >/dev/null
+    rm -f /tmp/dotnet-install.sh
+    [[ -e /usr/bin/dotnet ]] || ln -s "$root/dotnet" /usr/bin/dotnet
+
+    dotnet --list-runtimes 2>/dev/null | grep -q "^$framework $DOTNET_MAJOR\." || fail ".NET $DOTNET_MAJOR could not be installed."
+    ok ".NET $DOTNET_MAJOR runtime installed in $root"
 }
 
-ensure_nginx() {
-    if [[ "$WEB_SERVER" != "nginx" && "$WEB_SERVER" != "both" ]]; then return; fi
+ensure_web_server() {
+    [[ "$KIT_TYPE" == "Database" ]] && return 0
+    [[ "$KIT_TYPE" == "Api" && -z "$SITE_HOST" ]] && return 0
 
-    if command -v nginx &> /dev/null; then
-        if systemctl is-active --quiet nginx; then
-            write_step "[OK] Nginx is installed and running"
-        else
-            write_step "Starting Nginx..."
-            systemctl start nginx
-            write_step "[OK] Nginx started"
-        fi
-        return
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        apt_install nginx
+        systemctl enable --now nginx >/dev/null 2>&1
+        ok "Nginx is installed and running"
+    else
+        apt_install apache2
+        a2enmod proxy proxy_http proxy_wstunnel headers rewrite ssl >/dev/null
+        systemctl enable --now apache2 >/dev/null 2>&1
+        ok "Apache is installed and running"
     fi
 
-    write_step "Installing Nginx..."
-    apt-get install -y nginx > /dev/null 2>&1
-
-    # Enable and start
-    systemctl enable nginx > /dev/null 2>&1
-    systemctl start nginx > /dev/null 2>&1
-
-    write_step "[OK] Nginx installed and started"
-}
-
-ensure_apache() {
-    if [[ "$WEB_SERVER" != "apache" && "$WEB_SERVER" != "both" ]]; then return; fi
-
-    if command -v apache2ctl &> /dev/null; then
-        if systemctl is-active --quiet apache2; then
-            write_step "[OK] Apache2 is installed and running"
-        else
-            write_step "Starting Apache2..."
-            systemctl start apache2
-            write_step "[OK] Apache2 started"
-        fi
-        return
+    # Open HTTP/HTTPS when the ufw firewall is on
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow "$([[ "$WEB_SERVER" == "nginx" ]] && echo "Nginx Full" || echo "Apache Full")" >/dev/null
+        ok "Firewall (ufw) allows HTTP and HTTPS"
     fi
-
-    write_step "Installing Apache2 and required modules..."
-    apt-get install -y apache2 libapache2-mod-proxy-html libapache2-mod-rewrite > /dev/null 2>&1
-
-    # Enable required modules
-    a2enmod proxy proxy_http rewrite ssl headers > /dev/null 2>&1
-
-    # Enable and start
-    systemctl enable apache2 > /dev/null 2>&1
-    systemctl start apache2 > /dev/null 2>&1
-
-    write_step "[OK] Apache2 installed and started"
 }
 
 ensure_redis() {
-    if [[ "$SERVER_TYPE" != "Api" ]]; then return; fi
+    [[ "$KIT_TYPE" == "Api" && "$INSTALL_REDIS" == true ]] || return 0
+    apt_install redis-server
+    if ! grep -qE "^port $REDIS_PORT\$" /etc/redis/redis.conf; then
+        sed -i -E "s/^port .*/port $REDIS_PORT/" /etc/redis/redis.conf
+        systemctl restart redis-server
+    fi
+    systemctl enable --now redis-server >/dev/null 2>&1
+    redis-cli -p "$REDIS_PORT" ping 2>/dev/null | grep -q PONG || fail "Redis is not answering on port $REDIS_PORT."
+    ok "Redis is running on port $REDIS_PORT"
+}
 
-    local major=$REQUIRED_REDIS_MAJOR
-    write_step "Checking Redis $major..."
+# ---- Application files ------------------------------------------------------------------------------------------
 
-    # Try to find existing Redis service
-    if systemctl list-units --all | grep -E "redis|valkey" > /dev/null; then
-        REDIS_SERVICE=$(systemctl list-units --all | grep -oE 'redis-server|valkey-server' | head -1)
-        if systemctl is-active --quiet "$REDIS_SERVICE"; then
-            write_step "[OK] Redis/Valkey is running ($REDIS_SERVICE on port $REDIS_PORT)"
-            return
+backup_current() {
+    if [[ ! -d "$DEPLOY_PATH" || -z "$(ls -A "$DEPLOY_PATH" 2>/dev/null)" ]]; then
+        info "First deployment to $DEPLOY_PATH (nothing to back up)"
+        return 0
+    fi
+    mkdir -p "$BACKUP_PATH"
+    chmod 700 "$BACKUP_PATH"
+    BACKUP_FILE="$BACKUP_PATH/${SITE_NAME}_$(date +%Y%m%d_%H%M%S).tar.gz"
+    step "Backing up the current version"
+    tar -czf "$BACKUP_FILE" -C "$(dirname "$DEPLOY_PATH")" "$(basename "$DEPLOY_PATH")"
+    # Keep the five most recent backups of this site
+    ls -1t "$BACKUP_PATH/${SITE_NAME}_"*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+    ok "Backup saved to $BACKUP_FILE"
+}
+
+stop_service() {
+    [[ "$KIT_TYPE" == "Api" ]] || return 0
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        step "Stopping $SERVICE_NAME"
+        systemctl stop "$SERVICE_NAME"
+    fi
+}
+
+publish_files() {
+    step "Copying the application files to $DEPLOY_PATH"
+    local staging
+    staging=$(mktemp -d)
+    cp -a "$KIT_DIR/app/." "$staging/"
+    if [[ "$KIT_TYPE" == "Api" && -d "$KIT_DIR/sqlscripts" ]]; then
+        cp -a "$KIT_DIR/sqlscripts" "$staging/sqlscripts"
+    fi
+
+    # Files the server keeps (its own appsettings.json, upload folders, ...)
+    local relative
+    for relative in "${KEEP_PATHS[@]}"; do
+        [[ -z "$relative" || "$relative" == /* || "$relative" == *..* ]] && continue
+        if [[ -e "$DEPLOY_PATH/$relative" && -e "$staging/$relative" ]]; then
+            rm -rf "${staging:?}/$relative"
+            info "Keeping the server's copy of $relative"
         fi
-    fi
+    done
 
-    write_step "Installing Redis $major..."
-
-    # Install from Ubuntu repos (may not be latest major version; consider building from source if strict version needed)
-    apt-get install -y redis-server > /dev/null 2>&1
-
-    # Configure port
-    if grep -q "^port " /etc/redis/redis.conf; then
-        sed -i "s/^port .*/port $REDIS_PORT/" /etc/redis/redis.conf
-    fi
-
-    # Enable and start
-    systemctl enable redis-server > /dev/null 2>&1
-    systemctl start redis-server > /dev/null 2>&1
-
-    REDIS_SERVICE="redis-server"
-    write_step "[OK] Redis installed on port $REDIS_PORT"
+    mkdir -p "$DEPLOY_PATH"
+    cp -a "$staging/." "$DEPLOY_PATH/"
+    rm -rf "$staging"
+    ok "Application files copied"
 }
 
-ensure_directories() {
-    write_step "Creating deployment directories..."
+has_placeholders() { [[ -f "$1" ]] && grep -qE '<(SQL_SERVER|SQL_LOGIN|SQL_PASSWORD|DATABASE_NAME)>' "$1"; }
 
-    mkdir -p "$DEPLOYMENT_PATH"
-    if [[ "$SERVER_TYPE" == "Api" ]]; then
-        mkdir -p /var/log/deployvare
-        mkdir -p /etc/deployvare/ssl
+review_appsettings() {
+    [[ "$KIT_TYPE" == "Api" ]] || return 0
+    local settings="$DEPLOY_PATH/appsettings.json"
+    [[ -f "$settings" ]] || { warn "$settings does not exist. The application may need one."; return 0; }
+    has_placeholders "$settings" || return 0
+
+    warn "$settings still contains placeholder values such as <SQL_PASSWORD>."
+    if [[ "$ASSUME_YES" == false ]] && [[ -t 0 ]] && confirm "Edit it now with ${EDITOR:-nano}?"; then
+        command -v "${EDITOR:-nano}" >/dev/null 2>&1 || apt_install nano
+        "${EDITOR:-nano}" "$settings"
     fi
-
-    write_step "[OK] Directories created"
+    has_placeholders "$settings" && warn "Edit it later with: sudo nano $settings  then: sudo systemctl restart $SERVICE_NAME"
+    return 0
 }
 
-ensure_ssl_certificate() {
-    if [[ -z "$CERTIFICATE_FILE" || -z "$CERTIFICATE_KEY_FILE" ]]; then
-        write_info "No SSL certificate configured; skipping"
-        return
+set_permissions() {
+    step "Setting file ownership and permissions"
+    if [[ "$KIT_TYPE" == "Api" ]]; then
+        if ! id "$SERVICE_USER" >/dev/null 2>&1; then
+            useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+            info "Created system user $SERVICE_USER"
+        fi
+        # The service user owns its files (it may write logs or uploads); nobody else can read them
+        chown -R "$SERVICE_USER:$SERVICE_USER" "$DEPLOY_PATH"
+        find "$DEPLOY_PATH" -type d -exec chmod 750 {} +
+        find "$DEPLOY_PATH" -type f -exec chmod 640 {} +
+        [[ "$SELF_CONTAINED" == true ]] && chmod 750 "$DEPLOY_PATH/$APP_ENTRY"
+        ok "Owner $SERVICE_USER, folders 750, files 640"
+    else
+        # Static files: the web server (www-data) only reads them
+        chown -R www-data:www-data "$DEPLOY_PATH"
+        find "$DEPLOY_PATH" -type d -exec chmod 755 {} +
+        find "$DEPLOY_PATH" -type f -exec chmod 644 {} +
+        ok "Owner www-data, folders 755, files 644"
     fi
-
-    write_step "Installing SSL certificate..."
-
-    local src_cert="$PACKAGE_ROOT/$CERTIFICATE_FILE"
-    local src_key="$PACKAGE_ROOT/$CERTIFICATE_KEY_FILE"
-    local dst_dir="/etc/deployvare/ssl"
-
-    if [[ ! -f "$src_cert" ]]; then
-        fail "Certificate file not found: $src_cert"
-    fi
-    if [[ ! -f "$src_key" ]]; then
-        fail "Certificate key file not found: $src_key"
-    fi
-
-    cp "$src_cert" "$dst_dir/certificate.crt"
-    cp "$src_key" "$dst_dir/certificate.key"
-    chmod 600 "$dst_dir/certificate.key"
-
-    write_step "[OK] SSL certificate installed"
 }
 
-# ---- Web Server Configuration ----
-configure_nginx() {
-    if [[ "$WEB_SERVER" != "nginx" && "$WEB_SERVER" != "both" ]]; then return; fi
+# ---- Database ---------------------------------------------------------------------------------------------------
 
-    write_step "Configuring Nginx for $SITE_NAME..."
-
-    local conf_file="/etc/nginx/sites-available/$SITE_NAME"
-    local enabled_link="/etc/nginx/sites-enabled/$SITE_NAME"
-
-    # Create upstream for .NET app
-    cat > "$conf_file" << 'NGINX_CONF'
-# Auto-generated by DeployVare Deploy.sh
-upstream dotnet_backend {
-    server 127.0.0.1:5000 max_fails=3 fail_timeout=30s;
+connection_string() {
+    # appsettings.json may contain // comments, which jq does not accept
+    sed -E 's#^[[:space:]]*//.*$##' "$1" | jq -r '(.ConnectionStrings // {}) | to_entries | (.[0].value // empty)'
 }
 
-server {
-    listen 80;
-    server_name SITE_HOST_NAME;
-    root DEPLOYMENT_PATH;
+run_migrations() {
+    [[ "$RUN_MIGRATIONS" == true ]] || { [[ "$KIT_TYPE" == "Api" ]] && info "Database migrations: not run"; return 0; }
+    [[ "$HAS_SCRIPTS" == true ]] || { info "This build has no SQL scripts; nothing to migrate"; return 0; }
 
-    # Redirect HTTP to HTTPS
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
+    local migrator scripts settings
+    if [[ "$KIT_TYPE" == "Database" ]]; then
+        migrator="$KIT_DIR/$DBMIGRATOR_FOLDER/DbMigrator.dll"
+        settings="$KIT_DIR/appsettings.json"
+    else
+        migrator="$DEPLOY_PATH/DbMigrator.dll"
+        settings="$DEPLOY_PATH/appsettings.json"
+    fi
+    scripts="$KIT_DIR/sqlscripts"
+    [[ -f "$migrator" ]] || fail "DbMigrator.dll was not found ($migrator)."
+    [[ -d "$scripts" ]] || fail "The sqlscripts folder is missing from the kit."
+    [[ -f "$settings" ]] || fail "$settings was not found; it holds the database connection string."
+    has_placeholders "$settings" && fail "Edit the connection string in $settings first (it still has <...> values)."
+
+    local connection
+    connection=$(connection_string "$settings")
+    [[ -n "$connection" ]] || fail "No ConnectionStrings entry was found in $settings."
+
+    step "Running DbMigrator ($(find "$scripts" -type f -name '*.sql' | wc -l) SQL script(s) in the kit)"
+    if ! dotnet "$migrator" "$connection" "$scripts"; then
+        fail "DbMigrator failed. Nothing after the failing script was applied."
+    fi
+    ok "Database is up to date"
 }
 
-server {
-    listen 443 ssl http2;
-    server_name SITE_HOST_NAME;
-    root DEPLOYMENT_PATH;
+# ---- systemd service --------------------------------------------------------------------------------------------
 
-    ssl_certificate /etc/deployvare/ssl/certificate.crt;
-    ssl_certificate_key /etc/deployvare/ssl/certificate.key;
+install_service() {
+    [[ "$KIT_TYPE" == "Api" ]] || return 0
+    local unit="/etc/systemd/system/$SERVICE_NAME.service" exec_start
+    if [[ "$SELF_CONTAINED" == true ]]; then
+        exec_start="$DEPLOY_PATH/$APP_ENTRY"
+    else
+        exec_start="$(readlink -f "$(command -v dotnet)") $DEPLOY_PATH/$APP_ENTRY"
+    fi
 
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    step "Writing the systemd service $unit"
+    cat > "$unit" <<UNIT
+# Managed by DeployVare: this file is rewritten on every deployment.
+# Put your own settings in an override instead:  sudo systemctl edit $SERVICE_NAME
+# Secrets can go in /etc/default/$SERVICE_NAME as KEY=value lines (read when present).
+[Unit]
+Description=$APP_NAME API ($SERVICE_NAME)
+After=network-online.target$([[ "$INSTALL_REDIS" == true ]] && echo " redis-server.service")
+Wants=network-online.target
 
-    # Proxy to .NET app
-    location / {
-        proxy_pass http://dotnet_backend;
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_USER
+WorkingDirectory=$DEPLOY_PATH
+ExecStart=$exec_start
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=30
+SyslogIdentifier=$SERVICE_NAME
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:$APP_PORT
+Environment=DOTNET_NOLOGO=1
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+EnvironmentFile=-/etc/default/$SERVICE_NAME
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload
+    systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+    ok "Service $SERVICE_NAME starts automatically at boot"
+}
+
+start_service() {
+    [[ "$KIT_TYPE" == "Api" ]] || return 0
+    step "Starting $SERVICE_NAME"
+    systemctl restart "$SERVICE_NAME"
+
+    # Running, and answering HTTP on its port (any status code counts: the app is listening)
+    local attempt code=""
+    for attempt in $(seq 1 30); do
+        if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+            sleep 1
+            continue
+        fi
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$APP_PORT/" || true)
+        [[ -n "$code" && "$code" != "000" ]] && break
+        sleep 1
+    done
+
+    if ! systemctl is-active --quiet "$SERVICE_NAME" || [[ -z "$code" || "$code" == "000" ]]; then
+        echo "---- last 40 lines of: journalctl -u $SERVICE_NAME ----"
+        journalctl -u "$SERVICE_NAME" -n 40 --no-pager || true
+        fail "$SERVICE_NAME did not start listening on port $APP_PORT within 30 seconds."
+    fi
+    ok "$SERVICE_NAME is running (HTTP $code on 127.0.0.1:$APP_PORT)"
+}
+
+# ---- Web server site --------------------------------------------------------------------------------------------
+
+proxy_headers_nginx() {
+    cat <<'NGINX'
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection keep-alive;
+        proxy_set_header Connection $dv_connection_upgrade;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
+        proxy_read_timeout 300s;
+NGINX
+}
 
-    # Static files
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+nginx_locations() {
+    if [[ "$KIT_TYPE" == "Api" ]]; then
+        echo "    client_max_body_size 500m;"
+        echo "    location / {"
+        echo "        proxy_pass http://127.0.0.1:$APP_PORT;"
+        proxy_headers_nginx
+        echo "    }"
+        return
+    fi
+
+    cat <<NGINX
+    root $DEPLOY_PATH;
+    index index.html;
+
+    # Single-page app: unknown paths load index.html, which routes in the browser
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+    # Always fetch the current index.html and runtime config.js
+    location = /index.html { add_header Cache-Control "no-store"; }
+    location = /config.js  { add_header Cache-Control "no-store"; }
+    location /assets/ {
         expires 30d;
-        add_header Cache-Control "public, immutable";
+        add_header Cache-Control "public";
+        try_files \$uri =404;
     }
-}
-NGINX_CONF
-
-    # Replace placeholders
-    sed -i "s|SITE_HOST_NAME|$SITE_HOST_NAME|g" "$conf_file"
-    sed -i "s|DEPLOYMENT_PATH|$DEPLOYMENT_PATH|g" "$conf_file"
-
-    # Enable site
-    if [[ ! -L "$enabled_link" ]]; then
-        ln -s "$conf_file" "$enabled_link"
-    fi
-
-    # Test and reload
-    if nginx -t > /dev/null 2>&1; then
-        systemctl reload nginx > /dev/null 2>&1
-        write_step "[OK] Nginx configured"
-    else
-        fail "Nginx configuration test failed"
+NGINX
+    if [[ -n "$API_PROXY_UPSTREAM" ]]; then
+        echo "    client_max_body_size 500m;"
+        echo "    location ${API_PROXY_PATH:-/api}/ {"
+        echo "        proxy_pass ${API_PROXY_UPSTREAM%/};"
+        proxy_headers_nginx
+        echo "    }"
     fi
 }
 
-configure_apache() {
-    if [[ "$WEB_SERVER" != "apache" && "$WEB_SERVER" != "both" ]]; then return; fi
+write_nginx_site() {
+    local available="/etc/nginx/sites-available/$SITE_NAME" enabled="/etc/nginx/sites-enabled/$SITE_NAME"
+    local previous=""
+    [[ -f "$available" ]] && { previous=$(mktemp); cp -a "$available" "$previous"; }
 
-    write_step "Configuring Apache for $SITE_NAME..."
-
-    local conf_file="/etc/apache2/sites-available/$SITE_NAME.conf"
-    local enabled_link="/etc/apache2/sites-enabled/$SITE_NAME.conf"
-
-    cat > "$conf_file" << 'APACHE_CONF'
-# Auto-generated by DeployVare Deploy.sh
-<VirtualHost *:80>
-    ServerName SITE_HOST_NAME
-    DocumentRoot DEPLOYMENT_PATH
-
-    # Redirect HTTP to HTTPS
-    RewriteEngine On
-    RewriteCond %{HTTPS} off
-    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName SITE_HOST_NAME
-    DocumentRoot DEPLOYMENT_PATH
-
-    SSLEngine On
-    SSLCertificateFile /etc/deployvare/ssl/certificate.crt
-    SSLCertificateKeyFile /etc/deployvare/ssl/certificate.key
-
-    # Security headers
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "DENY"
-    Header always set X-XSS-Protection "1; mode=block"
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
-
-    # Proxy to .NET app
-    ProxyPreserveHost On
-    ProxyPass / http://127.0.0.1:5000/ timeout=3600
-    ProxyPassReverse / http://127.0.0.1:5000/
-
-    # WebSocket support
-    RewriteEngine On
-    RewriteCond %{HTTP:Upgrade} websocket [NC]
-    RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "http://127.0.0.1:5000/$1" [P,L]
-
-    # Static files caching
-    <FilesMatch "\.(?:js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
-        Header set Cache-Control "public, max-age=2592000"
-    </FilesMatch>
-</VirtualHost>
-APACHE_CONF
-
-    # Replace placeholders
-    sed -i "s|SITE_HOST_NAME|$SITE_HOST_NAME|g" "$conf_file"
-    sed -i "s|DEPLOYMENT_PATH|$DEPLOYMENT_PATH|g" "$conf_file"
-
-    # Enable site
-    if [[ ! -f "$enabled_link" ]]; then
-        ln -s "$conf_file" "$enabled_link"
-    fi
-
-    # Disable default site
-    a2dissite 000-default > /dev/null 2>&1 || true
-
-    # Test and reload
-    if apache2ctl configtest 2>&1 | grep -q "Syntax OK"; then
-        systemctl reload apache2 > /dev/null 2>&1
-        write_step "[OK] Apache configured"
-    else
-        fail "Apache configuration test failed"
-    fi
+    # Shared once for every DeployVare site: WebSocket upgrade header for proxied apps
+    cat > /etc/nginx/conf.d/deployvare-websocket.conf <<'NGINX'
+# Managed by DeployVare
+map $http_upgrade $dv_connection_upgrade {
+    default upgrade;
+    ''      close;
 }
+NGINX
 
-# ---- Database Setup (SQL Server) ----
-ensure_sql_server() {
-    if [[ "$SERVER_TYPE" != "Api" || -z "$SQL_DATABASE" ]]; then
-        return
-    fi
-
-    write_info "Note: SQL Server setup requires pre-installed SQL Server instance"
-    write_info "SQL_DATA_SOURCE: $SQL_DATA_SOURCE"
-    write_info "Database: $SQL_DATABASE"
-
-    if [[ "$FRESH_DATABASE" == "true" ]]; then
-        write_info "Fresh database flag set; manual SQL restore required"
-        write_info "Check deployment documentation for restore procedures"
-    fi
-}
-
-# ---- Application Deployment ----
-backup_site() {
-    if [[ ! -d "$DEPLOYMENT_PATH" ]] || [[ -z "$(ls -A "$DEPLOYMENT_PATH")" ]]; then
-        write_info "No existing site to backup"
-        return
-    fi
-
-    local backup_dir="$PACKAGE_ROOT/backups"
-    mkdir -p "$backup_dir"
-
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    local backup_file="$backup_dir/${SITE_NAME}_${timestamp}.tar.gz"
-
-    write_step "Backing up existing site to $backup_file..."
-    tar -czf "$backup_file" -C "$(dirname "$DEPLOYMENT_PATH")" "$(basename "$DEPLOYMENT_PATH")" \
-        2>/dev/null || true
-
-    write_step "[OK] Backup created"
-}
-
-publish_app() {
-    write_step "Deploying application..."
-
-    if [[ ! -d "$PACKAGE_ROOT/app" ]]; then
-        fail "app/ folder not found in package"
-    fi
-
-    # Stop the application if running
-    if systemctl is-active --quiet deployvare-app 2>/dev/null; then
-        write_step "Stopping deployvare-app service..."
-        systemctl stop deployvare-app || true
-        SITE_STOPPED=true
-    fi
-
-    # Deploy files
-    mkdir -p "$DEPLOYMENT_PATH"
-    cp -r "$PACKAGE_ROOT/app"/* "$DEPLOYMENT_PATH/" 2>/dev/null || true
-
-    # Copy SQL scripts if API server
-    if [[ "$SERVER_TYPE" == "Api" && -d "$PACKAGE_ROOT/sqlscripts" ]]; then
-        cp -r "$PACKAGE_ROOT/sqlscripts" "$DEPLOYMENT_PATH/" || true
-    fi
-
-    # Set permissions
-    chown -R www-data:www-data "$DEPLOYMENT_PATH" 2>/dev/null || \
-    chown -R nginx:nginx "$DEPLOYMENT_PATH" 2>/dev/null || true
-    chmod -R 755 "$DEPLOYMENT_PATH"
-
-    write_step "[OK] Application deployed"
-}
-
-create_systemd_service() {
-    if [[ "$SERVER_TYPE" != "Api" ]]; then return; fi
-
-    write_step "Creating systemd service for deployvare-app..."
-
-    local service_file="/etc/systemd/system/deployvare-app.service"
-
-    cat > "$service_file" << SYSTEMD_CONF
-[Unit]
-Description=DeployVare API Server
-After=network.target redis-server.service
-Wants=redis-server.service
-
-[Service]
-Type=notify
-User=www-data
-WorkingDirectory=$DEPLOYMENT_PATH
-ExecStart=$DEPLOYMENT_PATH/API
-Restart=on-failure
-RestartSec=5s
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=deployvare
-Environment="ASPNETCORE_ENVIRONMENT=Production"
-Environment="ASPNETCORE_URLS=http://127.0.0.1:5000"
-Environment="DOTNET_CLI_TELEMETRY_OPTOUT=1"
-
-[Install]
-WantedBy=multi-user.target
-SYSTEMD_CONF
-
-    systemctl daemon-reload > /dev/null 2>&1
-    systemctl enable deployvare-app > /dev/null 2>&1
-
-    write_step "[OK] Systemd service created"
-}
-
-start_app() {
-    if [[ "$SERVER_TYPE" != "Api" ]]; then return; fi
-
-    write_step "Starting deployvare-app service..."
-
-    systemctl start deployvare-app || fail "Failed to start deployvare-app"
-
-    # Wait for service to be ready
-    sleep 2
-
-    if systemctl is-active --quiet deployvare-app; then
-        write_step "[OK] deployvare-app is running"
-    else
-        fail "deployvare-app failed to start; check: sudo journalctl -u deployvare-app -n 50"
-    fi
-
-    SITE_STOPPED=false
-}
-
-ensure_hosts_entry() {
-    local hostname="$SITE_HOST_NAME"
-
-    if [[ "$hostname" == "localhost" || "$hostname" == "127.0.0.1"* ]]; then
-        return
-    fi
-
-    if grep -q "127.0.0.1.*$hostname" /etc/hosts; then
-        write_info "Hosts entry for $hostname already exists"
-        return
-    fi
-
-    write_step "Adding hosts entry for $hostname..."
-    echo "127.0.0.1    $hostname" >> /etc/hosts
-    write_step "[OK] Hosts entry added"
-}
-
-# ---- Main ----
-main() {
-    write_step "=== DeployVare Linux Deployment ==="
-    write_step "Server: $SERVER_NAME"
-    write_step "Type: $SERVER_TYPE"
-    write_step "Path: $DEPLOYMENT_PATH"
-    write_step ""
-
-    assert_root
-    ensure_root_writable_tmp
-    read_config
-
-    # System setup
-    ensure_dependencies
-    ensure_dotnet
-    ensure_nginx
-    ensure_apache
-    ensure_redis
-    ensure_directories
-    ensure_ssl_certificate
-
-    # Web server config
-    configure_nginx
-    configure_apache
-
-    # Database
-    ensure_sql_server
-
-    # Application deployment
-    backup_site
-    publish_app
-    create_systemd_service
-    start_app
-    ensure_hosts_entry
-
-    write_step ""
-    write_step "=== Deployment Complete ==="
-    write_step "Application running at: https://$SITE_HOST_NAME"
-    write_step "Logs: sudo journalctl -u deployvare-app -f"
-    write_step ""
-
-    # Save log
     {
-        printf '%s\n' "${STEP_LOGS[@]}"
-    } >> "$LOG_FILE"
+        echo "# Managed by DeployVare: rewritten on every deployment of $SITE_NAME."
+        if [[ -n "$CERT_PATH" ]]; then
+            cat <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $SITE_HOST;
+    return 301 https://\$host\$request_uri;
+}
 
-    write_step "Deployment log saved to: $LOG_FILE"
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name $SITE_HOST;
+    ssl_certificate     $CERT_PATH;
+    ssl_certificate_key $CERT_KEY_PATH;
+    ssl_protocols TLSv1.2 TLSv1.3;
+NGINX
+        else
+            cat <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $SITE_HOST;
+NGINX
+        fi
+        nginx_locations
+        echo "}"
+    } > "$available"
+
+    ln -sfn "$available" "$enabled"
+    if ! nginx -t >/dev/null 2>&1; then
+        nginx -t || true
+        if [[ -n "$previous" ]]; then mv "$previous" "$available"; else rm -f "$available" "$enabled"; fi
+        fail "The Nginx configuration test failed; the previous site configuration was restored."
+    fi
+    [[ -n "$previous" ]] && rm -f "$previous"
+    systemctl reload nginx
+    ok "Nginx site $SITE_NAME is live for $SITE_HOST"
+}
+
+apache_body() {
+    if [[ "$KIT_TYPE" == "Api" ]]; then
+        cat <<APACHE
+    ProxyPreserveHost On
+    ProxyPass        / http://127.0.0.1:$APP_PORT/ upgrade=websocket timeout=300
+    ProxyPassReverse / http://127.0.0.1:$APP_PORT/
+    LimitRequestBody 524288000
+APACHE
+        return
+    fi
+    cat <<APACHE
+    DocumentRoot $DEPLOY_PATH
+    <Directory $DEPLOY_PATH>
+        Options -Indexes
+        AllowOverride None
+        Require all granted
+        FallbackResource /index.html
+    </Directory>
+    <FilesMatch "^(index\.html|config\.js)$">
+        Header set Cache-Control "no-store"
+    </FilesMatch>
+APACHE
+    if [[ -n "$API_PROXY_UPSTREAM" ]]; then
+        local path="${API_PROXY_PATH:-/api}" upstream="${API_PROXY_UPSTREAM%/}"
+        cat <<APACHE
+    ProxyPreserveHost On
+    ProxyPass        $path/ $upstream$path/ upgrade=websocket timeout=300
+    ProxyPassReverse $path/ $upstream$path/
+APACHE
+    fi
+}
+
+write_apache_site() {
+    local available="/etc/apache2/sites-available/$SITE_NAME.conf" previous=""
+    [[ -f "$available" ]] && { previous=$(mktemp); cp -a "$available" "$previous"; }
+    {
+        echo "# Managed by DeployVare: rewritten on every deployment of $SITE_NAME."
+        echo "<VirtualHost *:80>"
+        echo "    ServerName $SITE_HOST"
+        if [[ -n "$CERT_PATH" ]]; then
+            echo "    Redirect permanent / https://$SITE_HOST/"
+            echo "</VirtualHost>"
+            echo
+            echo "<VirtualHost *:443>"
+            echo "    ServerName $SITE_HOST"
+            echo "    SSLEngine on"
+            echo "    SSLCertificateFile    $CERT_PATH"
+            echo "    SSLCertificateKeyFile $CERT_KEY_PATH"
+            echo "    RequestHeader set X-Forwarded-Proto \"https\""
+        else
+            echo "    RequestHeader set X-Forwarded-Proto \"http\""
+        fi
+        apache_body
+        echo "</VirtualHost>"
+    } > "$available"
+
+    a2ensite "$SITE_NAME" >/dev/null
+    if ! apache2ctl configtest >/dev/null 2>&1; then
+        apache2ctl configtest || true
+        if [[ -n "$previous" ]]; then mv "$previous" "$available"; else a2dissite "$SITE_NAME" >/dev/null 2>&1 || true; rm -f "$available"; fi
+        fail "The Apache configuration test failed; the previous site configuration was restored."
+    fi
+    [[ -n "$previous" ]] && rm -f "$previous"
+    systemctl reload apache2
+    ok "Apache site $SITE_NAME is live for $SITE_HOST"
+}
+
+configure_site() {
+    [[ "$KIT_TYPE" == "Database" ]] && return 0
+    if [[ "$KIT_TYPE" == "Api" && -z "$SITE_HOST" ]]; then
+        info "No host name for the API: no web server site was created (the frontend's API route reaches it)."
+        return 0
+    fi
+    step "Configuring the $WEB_SERVER site $SITE_NAME"
+    if [[ "$WEB_SERVER" == "nginx" ]]; then write_nginx_site; else write_apache_site; fi
+}
+
+# ---- Main -------------------------------------------------------------------------------------------------------
+
+summary() {
+    local scheme=http
+    [[ -n "$CERT_PATH" ]] && scheme=https
+    echo
+    echo "=== Deployment complete: $APP_NAME #$BUILD_NUMBER ($KIT_TYPE) ==="
+    case "$KIT_TYPE" in
+        Api)
+            [[ -n "$SITE_HOST" ]] && echo "  URL:      $scheme://$SITE_HOST"
+            echo "  Status:   sudo systemctl status $SERVICE_NAME"
+            echo "  Logs:     sudo journalctl -u $SERVICE_NAME -f"
+            echo "  Settings: sudo nano $DEPLOY_PATH/appsettings.json   (then: sudo systemctl restart $SERVICE_NAME)"
+            ;;
+        Frontend)
+            echo "  URL:      $scheme://$SITE_HOST"
+            echo "  Files:    $DEPLOY_PATH   (runtime settings: $DEPLOY_PATH/config.js)"
+            ;;
+        Database)
+            echo "  The database is migrated. Deploy the API kit next, then the frontend kit."
+            ;;
+    esac
+    [[ -n "$BACKUP_FILE" ]] && echo "  Backup:   $BACKUP_FILE"
+    echo "  Log:      $LOG_FILE"
+}
+
+main() {
+    assert_environment
+    # Everything that follows is also written to deployment.log
+    exec > >(tee -a "$LOG_FILE") 2>&1
+    echo "---- $(date -Is) Deploy.sh $* ----"
+
+    read_config
+    show_plan
+
+    ensure_dotnet
+    if [[ "$KIT_TYPE" == "Database" ]]; then
+        run_migrations
+        summary
+        return 0
+    fi
+
+    ensure_redis
+    ensure_web_server
+    backup_current
+    stop_service
+    publish_files
+    review_appsettings
+    set_permissions
+    run_migrations
+    install_service
+    start_service
+    configure_site
+    summary
 }
 
 main "$@"

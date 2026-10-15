@@ -248,6 +248,7 @@ builder.Services.AddSingleton<API.Services.Interfaces.IDeploymentProgressTracker
 // Long actions (deployments, package builds) run outside the request that started them
 builder.Services.AddSingleton<API.Services.IBackgroundOperations, API.Services.BackgroundOperations>();
 builder.Services.AddScoped<API.Services.Interfaces.IManualPackageService, API.Services.Implementations.ManualPackageService>();
+builder.Services.AddScoped<API.Services.Interfaces.ILinuxDeploymentService, API.Services.Implementations.LinuxDeploymentService>();
 
 // Licensing: the signing key lives outside the application folder, so only this installation can issue licences
 builder.Services.Configure<API.Models.LicensingOptions>(builder.Configuration.GetSection(API.Models.LicensingOptions.SectionName));

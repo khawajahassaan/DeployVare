@@ -129,7 +129,8 @@ public class ApiDeploymentsController : ControllerBase
     {
         var found = _operations.GetFile(operationId, token, file);
         if (found == null) return NotFound(new { error = "This download link is invalid or has expired. Build the package again." });
-        return PhysicalFile(found.Path, "application/zip", found.FileName, enableRangeProcessing: true);
+        var contentType = found.FileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) ? "application/gzip" : "application/zip";
+        return PhysicalFile(found.Path, contentType, found.FileName, enableRangeProcessing: true);
     }
 
     /// <summary>

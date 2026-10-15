@@ -1,5 +1,9 @@
 # Linux Deployment Guide
 
+> **Deploying applications to Linux servers from DeployVare** (the *Linux Deployment* module, the `.tar.gz` kits
+> and the current `Deploy.sh`): see **[LINUX_DEPLOYMENT_GUIDE.md](LINUX_DEPLOYMENT_GUIDE.md)**. The *Manual
+> Deployment (Deploy.sh)* section below describes an earlier version of the script and its `deploy-config.json`.
+
 This guide covers deploying DeployVare on Ubuntu 20.04 LTS / 22.04 LTS or Debian 11/12. Both **manual deployment** and **Docker deployment** are supported.
 
 ---
