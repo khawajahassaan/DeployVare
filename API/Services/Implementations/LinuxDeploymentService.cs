@@ -600,9 +600,11 @@ public class LinuxDeploymentService : ILinuxDeploymentService
     private const string FactsCommand =
         ". /etc/os-release 2>/dev/null; echo \"OS=${PRETTY_NAME:-unknown}\"; " +
         "command -v apt-get >/dev/null 2>&1 && echo APT=1 || echo APT=0; " +
+        "{ command -v dnf || command -v yum; } >/dev/null 2>&1 && echo DNF=1 || echo DNF=0; " +
+        "command -v getenforce >/dev/null 2>&1 && echo \"SELINUX=$(getenforce)\"; " +
         "command -v systemctl >/dev/null 2>&1 && echo SYSTEMD=1 || echo SYSTEMD=0; " +
         "test -x /usr/sbin/nginx && echo NGINX=1 || echo NGINX=0; " +
-        "test -x /usr/sbin/apache2 && echo APACHE=1 || echo APACHE=0; " +
+        "{ test -x /usr/sbin/apache2 || test -x /usr/sbin/httpd; } && echo APACHE=1 || echo APACHE=0; " +
         "echo \"DOTNET=$(dotnet --list-runtimes 2>/dev/null | awk '/AspNetCore/ {print $2}' | paste -sd, -)\"; " +
         "echo \"DISK=$(df -Pm /var 2>/dev/null | awk 'NR==2 {print $4}')\"";
 
@@ -618,7 +620,10 @@ public class LinuxDeploymentService : ILinuxDeploymentService
             var (_, lines) = await RunAsync(client, FactsCommand, null, TimeSpan.FromSeconds(30), null, cancellationToken);
             var facts = lines.Select(l => l.Split('=', 2)).Where(p => p.Length == 2).ToDictionary(p => p[0], p => p[1].Trim());
             result.Os = facts.GetValueOrDefault("OS");
-            result.SupportedOs = facts.GetValueOrDefault("APT") == "1" && facts.GetValueOrDefault("SYSTEMD") == "1";
+            // Ubuntu/Debian (apt) or the Red Hat family (dnf: RHEL, Rocky, AlmaLinux, CentOS Stream)
+            result.SupportedOs = (facts.GetValueOrDefault("APT") == "1" || facts.GetValueOrDefault("DNF") == "1")
+                && facts.GetValueOrDefault("SYSTEMD") == "1";
+            result.SeLinux = facts.GetValueOrDefault("SELINUX");
             result.NginxInstalled = facts.GetValueOrDefault("NGINX") == "1";
             result.ApacheInstalled = facts.GetValueOrDefault("APACHE") == "1";
             result.DotNetRuntimes = string.IsNullOrWhiteSpace(facts.GetValueOrDefault("DOTNET")) ? null : facts["DOTNET"];
@@ -631,7 +636,7 @@ public class LinuxDeploymentService : ILinuxDeploymentService
 
             result.Success = result.SupportedOs && result.SudoWorks == true;
             result.Message = !result.SupportedOs
-                ? $"Connected, but {result.Os ?? "this OS"} is not supported: the kits need Ubuntu or Debian (apt-get and systemd)."
+                ? $"Connected, but {result.Os ?? "this OS"} is not supported: the kits need Ubuntu/Debian or a Red Hat family server (RHEL, Rocky, AlmaLinux) with systemd."
                 : result.SudoWorks != true
                     ? SudoHelp(target)
                     : $"Connected to {result.Os} as {target.Username}; sudo works.";
@@ -647,7 +652,7 @@ public class LinuxDeploymentService : ILinuxDeploymentService
     private static string SudoHelp(LinuxSshTarget target) =>
         string.IsNullOrEmpty(target.SudoPassword ?? target.Password)
             ? $"Connected, but sudo needs a password for {target.Username}. Enter the sudo password, or allow passwordless sudo for this user."
-            : $"Connected, but sudo was refused for {target.Username}: check the sudo password and that the user is in the sudo group.";
+            : $"Connected, but sudo was refused for {target.Username}: check the sudo password and that the user is in the sudo group (Ubuntu) or wheel group (Red Hat).";
 
     // ---- One-click deployment --------------------------------------------------------------------------------------
 
@@ -707,7 +712,7 @@ public class LinuxDeploymentService : ILinuxDeploymentService
                 var test = await TestConnectionAsync(server, cancellationToken);
                 if (!test.Success) throw new InvalidOperationException($"{server.Host}: {test.Message}");
             }
-            stages.Done("connect", string.Join(", ", servers.Select(s => s.Host)) + ": Ubuntu/Debian, sudo works");
+            stages.Done("connect", string.Join(", ", servers.Select(s => s.Host)) + ": supported OS, sudo works");
 
             // 2. Kits
             var kits = new List<(Kit Kit, LinuxSshTarget Server)>();

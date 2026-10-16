@@ -489,6 +489,8 @@ export interface LinuxConnectionTest {
   nginxInstalled?: boolean | null;
   apacheInstalled?: boolean | null;
   diskFreeMb?: number | null;
+  /** Enforcing / Permissive / Disabled on Red Hat family servers */
+  seLinux?: string | null;
 }
 
 export interface LinuxDeploymentKitResult {

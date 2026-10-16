@@ -1,8 +1,8 @@
 # Deploying to Linux with DeployVare — a guide for Windows/IIS people
 
 This guide explains how a .NET backend and a static frontend run on Linux, what DeployVare's **Linux Deployment**
-module does for you, and how to do the same by hand. Target servers: **Ubuntu 22.04/24.04 or Debian 12** (anything
-with `apt-get` and `systemd`).
+module does for you, and how to do the same by hand. Target servers: **Ubuntu 22.04+ / Debian 11+**, or the **Red Hat
+family: RHEL 8/9/10, Rocky Linux, AlmaLinux, CentOS Stream** (section 4b covers what differs there).
 
 ---
 
@@ -120,7 +120,8 @@ Notes:
 
 ## 4. Preparing a fresh server
 
-You need an Ubuntu/Debian server you can SSH into as a user with `sudo` (e.g. `ubuntu`), or as root.
+You need a server you can SSH into as a user with `sudo` (e.g. `ubuntu` on Ubuntu, a member of `wheel` on Red Hat), or
+as root. The commands below are the Ubuntu ones; section 4b has the Red Hat equivalents.
 
 `Deploy.sh` installs everything that is missing. This is what it does, so you know what ends up on the server:
 
@@ -138,15 +139,50 @@ Firewall: when `ufw` is on, Deploy.sh allows "Nginx Full" (ports 80 and 443). Cl
 a network security group / security group: open 80/443 there. Only open 1433 on the SQL Server, and only to the API
 server.
 
+## 4b. Red Hat family servers (RHEL, Rocky Linux, AlmaLinux, CentOS Stream)
+
+The same kits and the same `sudo bash Deploy.sh` work. The script detects the OS and switches automatically:
+
+| | Ubuntu / Debian | Red Hat family |
+|---|---|---|
+| Packages | `apt-get` | `dnf` |
+| .NET runtime | Microsoft's installer script | `dnf install aspnetcore-runtime-10.0` (Red Hat's own package); the script is the fallback |
+| Nginx site file | `/etc/nginx/sites-available/<site>` + link in `sites-enabled` | `/etc/nginx/conf.d/<site>.conf` |
+| Apache | `apache2`, `a2ensite`, `/etc/apache2/sites-available` | `httpd` (+ `mod_ssl` for HTTPS), `/etc/httpd/conf.d/<site>.conf` |
+| Web server user (frontend files) | `www-data` | `nginx` or `apache` |
+| Redis | `redis-server` | `redis` (RHEL 8/9) or **Valkey** on RHEL 10 (same protocol, port 6379) |
+| Firewall | `ufw` | `firewalld`: `firewall-cmd --add-service=http --add-service=https` |
+| Service secrets file | `/etc/default/<service>` | `/etc/sysconfig/<service>` |
+| sudo group | `sudo` | `wheel` |
+
+**SELinux** (on by default on Red Hat) is the part people trip over: Nginx is not allowed to open network connections
+or read files with the wrong label, so a site can return `502 Bad Gateway` or `403 Forbidden` even though everything else
+is right. `Deploy.sh` handles it:
+
+```bash
+sudo setsebool -P httpd_can_network_connect 1         # let Nginx/Apache forward to Kestrel
+sudo restorecon -R /var/www/<app>-web                 # files copied from /tmp keep the wrong label
+sudo semanage fcontext -a -t httpd_sys_content_t "/srv/myapp(/.*)?"   # only for folders outside /var/www
+sudo semanage fcontext -a -t bin_t "/var/www/<app>-api/<App>"         # a self-contained app, so systemd may start it
+```
+
+To check SELinux when something is blocked: `getenforce` shows the mode, and
+`sudo ausearch -m avc -ts recent` lists what it denied.
+
+Minimal Red Hat images may not have `nano`: `sudo dnf install -y nano`, or edit with `vi`.
+
+RHEL needs an active subscription for `dnf` to reach Red Hat's repositories; Rocky Linux and AlmaLinux need nothing.
+Apache on RHEL 8 (2.4.37) is too old for WebSockets through Apache, so Nginx is the better choice there.
+
 ---
 
 ## 5. Where files go
 
 | What | Path |
 |---|---|
-| Backend files | `/var/www/<app>-api` (owner `www-data`, folders 750, files 640) |
+| Backend files | `/var/www/<app>-api` (owner: the service user, `www-data` by default; folders 750, files 640) |
 | Backend settings | `/var/www/<app>-api/appsettings.json` |
-| Frontend files | `/var/www/<app>-web` (owner `www-data`, folders 755, files 644) |
+| Frontend files | `/var/www/<app>-web` (owner: the web server's user, `www-data` or `nginx`/`apache` on Red Hat; folders 755, files 644) |
 | Frontend runtime settings | `/var/www/<app>-web/config.js` (`VITE_API_URL`, ...) |
 | systemd service | `/etc/systemd/system/<app>-api.service` |
 | Extra secrets for the service (optional) | `/etc/default/<app>-api` (`KEY=value` lines) |
@@ -356,6 +392,8 @@ With certificate paths set, port 80 redirects to HTTPS and port 443 serves TLS 1
 | Frontend loads but API calls fail | `config.js` `VITE_API_URL`, the `/api` route, or CORS on the API |
 | Login loops / wrong redirects behind HTTPS | The app needs `UseForwardedHeaders` (section 3) |
 | SSH test: "sudo needs a password" | Enter the sudo password, or allow passwordless sudo for the user |
+| Red Hat: `502` or `403` although the app runs | SELinux: `sudo ausearch -m avc -ts recent`; rerun `sudo bash Deploy.sh`, which sets the labels and permission |
+| Red Hat: `status=203/EXEC` for the service | SELinux label of the program: `sudo restorecon -v <path>` (Deploy.sh labels it `bin_t`) |
 | Can't reach SQL Server | `nc -vz <sql-host> 1433` from the API server; firewall/NSG on the SQL Server |
 
 ## 12. Rolling back
@@ -371,7 +409,7 @@ sudo systemctl start auditvare-api
 
 ## Limitations
 
-- Ubuntu/Debian only (apt + systemd). RHEL-family servers are not supported by `Deploy.sh`.
+- Ubuntu/Debian and the Red Hat family (apt or dnf, with systemd). SUSE, Alpine and other distributions are not supported.
 - SSH host keys are not verified (same as the Windows server tooling).
 - SQL Server itself is not installed or restored on Linux; the database must exist.
 - Deployments are not recorded in App History yet. The result and full `Deploy.sh` output appear on the page.

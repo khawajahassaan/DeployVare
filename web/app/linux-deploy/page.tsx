@@ -352,6 +352,7 @@ function SshServerForm({
           <Badge variant="secondary">.NET: {test.dotNetRuntimes || 'not installed (installed on deploy)'}</Badge>
           <Badge variant="secondary">Nginx: {test.nginxInstalled ? 'installed' : 'not installed'}</Badge>
           {test.apacheInstalled && <Badge variant="secondary">Apache: installed</Badge>}
+          {test.seLinux && <Badge variant="secondary">SELinux: {test.seLinux} (handled on deploy)</Badge>}
           {test.diskFreeMb != null && <Badge variant={test.diskFreeMb < 2048 ? 'warning' : 'secondary'}>{(test.diskFreeMb / 1024).toFixed(1)} GB free in /var</Badge>}
         </div>
       )}
@@ -362,11 +363,11 @@ function SshServerForm({
 // ---- Guides ----------------------------------------------------------------------------------------------------
 
 const WINDOWS_TO_LINUX: [string, string][] = [
-  ['IIS website + bindings', 'Nginx (or Apache) site in /etc/nginx/sites-available'],
+  ['IIS website + bindings', 'Nginx (or Apache) site: sites-available (Ubuntu) or conf.d (Red Hat)'],
   ['IIS application pool (w3wp.exe)', 'systemd service running Kestrel (dotnet App.dll)'],
   ['ASP.NET Core Module in IIS', 'Nginx reverse proxy → http://127.0.0.1:5000'],
   ['C:\\inetpub\\wwwroot\\app', '/var/www/app'],
-  ['App pool identity + NTFS rights', 'service user www-data + chown / chmod'],
+  ['App pool identity + NTFS rights', 'service user + chown / chmod (+ SELinux labels on Red Hat)'],
   ['services.msc / IIS Manager', 'systemctl status | restart | enable'],
   ['Event Viewer', 'journalctl -u <service> -f'],
   ['Windows authentication to SQL', 'SQL login in appsettings.json'],
@@ -466,7 +467,8 @@ function ManualGuide({ target, slug, serviceName }: { target: LinuxDeploymentTar
           <li>Backs up the current folder to <code>/var/backups/deployvare</code> (last 5 kept).</li>
           <li>Copies <code>app/</code> to <code>/var/www/…</code>, keeping the server&apos;s own <code>appsettings.json</code>.</li>
           <li>
-            <code>chown</code>/<code>chmod</code>: API files belong to <code>www-data</code> (750/640), frontend files are readable by Nginx (755/644).
+            <code>chown</code>/<code>chmod</code>: API files belong to the service user (750/640), frontend files are readable by the web server (755/644).
+            On Red Hat it also sets the SELinux labels and permission, and opens HTTP/HTTPS in firewalld.
           </li>
           {hasApi && <li>Writes <code>/etc/systemd/system/{serviceName}.service</code> (starts at boot, restarts on crash) and starts it.</li>}
           <li>Writes the Nginx site, runs <code>nginx -t</code> and reloads; a bad config is rolled back.</li>
@@ -769,7 +771,7 @@ export default function LinuxDeployPage() {
       <div className="space-y-6">
         <PageHeader
           title="Linux Deployment"
-          description="Deploy Azure DevOps builds to Ubuntu/Debian servers: Kestrel + systemd behind Nginx or Apache"
+          description="Deploy Azure DevOps builds to Ubuntu, Debian or Red Hat (RHEL, Rocky, AlmaLinux) servers: Kestrel + systemd behind Nginx or Apache"
           icon={Terminal}
         />
 
@@ -1135,7 +1137,7 @@ export default function LinuxDeployPage() {
               <div className="space-y-3">
                 <Collapsible title="What happens when you press Deploy" icon={Rocket} defaultOpen>
                   <ol className="list-decimal space-y-1 pl-5">
-                    <li>Logs in over SSH and checks the OS (Ubuntu/Debian) and sudo.</li>
+                    <li>Logs in over SSH and checks the OS (Ubuntu/Debian or Red Hat family) and sudo.</li>
                     <li>Downloads the Linux build from Azure DevOps and assembles the kit, adding <code>appsettings.json</code> when the build has none.</li>
                     <li>Uploads it over SFTP to a private folder in <code>/tmp</code>.</li>
                     <li>

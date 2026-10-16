@@ -226,9 +226,15 @@ public static class LinuxKitBuilder
         text.AppendLine("ssh user@SERVER");
         text.AppendLine($"cd /tmp && tar -xzf {fileName} && cd {folder}");
         if (config.KitType is "Api" or "Database")
+        {
+            text.AppendLine("sudo dnf install -y nano     # Red Hat / Rocky / AlmaLinux only, when nano is missing (or use vi)");
             text.AppendLine($"nano {(config.KitType == "Api" ? "app/" : "")}appsettings.json   # set ConnectionStrings first (see below)");
+        }
         text.AppendLine("sudo bash Deploy.sh");
         text.AppendLine("```");
+        text.AppendLine();
+        text.AppendLine("Works on Ubuntu/Debian and on the Red Hat family (RHEL 8+, Rocky Linux, AlmaLinux, CentOS Stream). On Red Hat the script");
+        text.AppendLine("also opens HTTP/HTTPS in firewalld and sets the SELinux permission and file labels the web server needs.");
         text.AppendLine();
         text.AppendLine("The script shows what it will do and asks before changing anything. `sudo bash Deploy.sh --help` lists its options.");
         text.AppendLine();
@@ -268,7 +274,7 @@ public static class LinuxKitBuilder
                 text.AppendLine("## What Deploy.sh does");
                 text.AppendLine();
                 text.AppendLine($"1. Installs {WebServerName(config.WebServer)} when it is missing.");
-                text.AppendLine($"1. Backs up `{config.DeploymentPath}`, copies `app/` there, `chown -R www-data` and `chmod` (folders 755, files 644).");
+                text.AppendLine($"1. Backs up `{config.DeploymentPath}`, copies `app/` there, gives the files to the web server's user (`www-data`, or `nginx`/`apache` on Red Hat) and `chmod` (folders 755, files 644).");
                 text.AppendLine($"1. Writes the site `{config.SiteName}` for `{scheme}://{config.SiteHostName}`: serves the files and sends unknown paths to `index.html` (single-page app).");
                 if (!string.IsNullOrWhiteSpace(config.ApiProxyUpstream))
                     text.AppendLine($"1. Forwards `{config.ApiProxyPath ?? "/api"}/` to the backend at `{config.ApiProxyUpstream}`.");

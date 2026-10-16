@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DeployVare Linux deployment kit (Ubuntu / Debian).
+# DeployVare Linux deployment kit: Ubuntu / Debian, and the Red Hat family (RHEL, Rocky Linux, AlmaLinux, CentOS Stream).
 #
 # Run it from the extracted kit folder as root:
 #     sudo bash Deploy.sh
@@ -24,7 +24,9 @@ LOG_FILE="$KIT_DIR/deployment.log"
 ASSUME_YES=false
 MIGRATIONS_OVERRIDE=""
 BACKUP_FILE=""
-APT_UPDATED=false
+PKG_UPDATED=false
+OS_FAMILY=""
+REDIS_SERVICE=""
 
 usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -67,24 +69,88 @@ confirm() {
 
 assert_environment() {
     [[ $EUID -eq 0 ]] || { echo "Run this script as root: sudo bash Deploy.sh"; exit 1; }
-    command -v apt-get >/dev/null 2>&1 || { echo "This kit supports Ubuntu and Debian (apt-get was not found)."; exit 1; }
     command -v systemctl >/dev/null 2>&1 || { echo "systemd is required (systemctl was not found)."; exit 1; }
     [[ -f "$CONFIG" ]] || { echo "deploy-config.json was not found next to Deploy.sh. Run the script from the extracted kit folder."; exit 1; }
+    detect_os
 }
 
-apt_install() {
+# debian: Ubuntu/Debian (apt). rhel: RHEL, Rocky, AlmaLinux, CentOS Stream, Oracle Linux (dnf).
+# Package names, the web server's user, its configuration folders and the firewall differ between the two.
+detect_os() {
+    OS_NAME=$( (. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-${ID:-Linux}}") || echo Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+        OS_FAMILY=debian
+        PKG_TOOL=apt-get
+        DEFAULTS_DIR=/etc/default
+    elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
+        OS_FAMILY=rhel
+        PKG_TOOL=$(command -v dnf >/dev/null 2>&1 && echo dnf || echo yum)
+        DEFAULTS_DIR=/etc/sysconfig
+    else
+        echo "This kit supports Ubuntu/Debian (apt-get) and Red Hat family servers (dnf); neither was found on $OS_NAME."
+        exit 1
+    fi
+}
+
+# User the web server runs as: it reads the frontend files
+web_user() {
+    if [[ "$OS_FAMILY" == debian ]]; then echo www-data
+    elif [[ "$WEB_SERVER" == apache ]]; then echo apache
+    else echo nginx
+    fi
+}
+
+pkg_installed() {
+    if [[ "$OS_FAMILY" == debian ]]; then dpkg -s "$1" >/dev/null 2>&1; else rpm -q "$1" >/dev/null 2>&1; fi
+}
+
+pkg_install() {
     local missing=() package
     for package in "$@"; do
-        dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package")
+        pkg_installed "$package" || missing+=("$package")
     done
     [[ ${#missing[@]} -eq 0 ]] && return 0
-    if [[ "$APT_UPDATED" == false ]]; then
-        step "Updating the package lists (apt-get update)"
-        DEBIAN_FRONTEND=noninteractive apt-get update -qq
-        APT_UPDATED=true
+    if [[ "$OS_FAMILY" == debian ]]; then
+        if [[ "$PKG_UPDATED" == false ]]; then
+            step "Updating the package lists (apt-get update)"
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            PKG_UPDATED=true
+        fi
+        step "Installing ${missing[*]}"
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
+    else
+        step "Installing ${missing[*]}"
+        "$PKG_TOOL" install -y -q "${missing[@]}" >/dev/null
     fi
-    step "Installing ${missing[*]}"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
+}
+
+# Commands rather than packages: minimal RHEL images ship curl-minimal, which provides curl but is not "curl"
+require_commands() {
+    local command
+    for command in "$@"; do
+        command -v "$command" >/dev/null 2>&1 || pkg_install "$command"
+    done
+}
+
+selinux_enabled() {
+    command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce 2>/dev/null)" != "Disabled" ]]
+}
+
+ensure_semanage() {
+    command -v semanage >/dev/null 2>&1 || pkg_install policycoreutils-python-utils || true
+    command -v semanage >/dev/null 2>&1
+}
+
+# A file moved back from /tmp keeps the temporary label; give it its folder's default again
+relabel() {
+    if selinux_enabled; then restorecon "$1" || true; fi
+    return 0
+}
+
+# Persistent SELinux label for a path (pattern); restorecon applies it
+selinux_label() {
+    ensure_semanage || { warn "semanage is not available: SELinux label $1 for $2 was not set."; return 0; }
+    semanage fcontext -a -t "$1" "$2" 2>/dev/null || semanage fcontext -m -t "$1" "$2"
 }
 
 # ---- Configuration ----------------------------------------------------------------------------------------------
@@ -92,7 +158,8 @@ apt_install() {
 cfg() { jq -r "$1 // empty" "$CONFIG"; }
 
 read_config() {
-    apt_install jq ca-certificates curl tar
+    require_commands jq curl tar
+    pkg_install ca-certificates
 
     KIT_TYPE=$(cfg .kitType)
     APP_NAME=$(cfg .applicationName)
@@ -174,7 +241,7 @@ validate_config() {
 
 show_plan() {
     echo
-    echo "DeployVare Linux deployment: $APP_NAME build #$BUILD_NUMBER ($KIT_TYPE kit)"
+    echo "DeployVare Linux deployment: $APP_NAME build #$BUILD_NUMBER ($KIT_TYPE kit) on $OS_NAME"
     case "$KIT_TYPE" in
         Api)
             echo "  Files:        $DEPLOY_PATH"
@@ -195,6 +262,7 @@ show_plan() {
             ;;
     esac
     [[ "$KIT_TYPE" != "Database" ]] && echo "  HTTPS:        $([[ -n "$CERT_PATH" ]] && echo "$CERT_PATH" || echo "not configured (HTTP only)")"
+    selinux_enabled && echo "  SELinux:      $(getenforce): file labels and the proxy permission are set"
     echo
     confirm "Continue?" || { echo "Cancelled. Nothing was changed."; exit 0; }
 }
@@ -216,10 +284,21 @@ ensure_dotnet() {
     fi
 
     step "Installing the ASP.NET Core $DOTNET_MAJOR runtime"
-    # .NET needs ICU; the package name carries the version (libicu70, libicu74, ...)
-    local icu
-    icu=$(apt-cache pkgnames libicu 2>/dev/null | grep -E '^libicu[0-9]+$' | sort -V | tail -1 || true)
-    apt_install ${icu:+"$icu"} libssl3 2>/dev/null || apt_install ${icu:+"$icu"}
+    if [[ "$OS_FAMILY" == rhel ]]; then
+        # Red Hat ships .NET in its own repositories (installed to /usr/lib64/dotnet, labelled for SELinux)
+        if pkg_install "aspnetcore-runtime-$DOTNET_MAJOR.0" 2>/dev/null \
+            && dotnet --list-runtimes 2>/dev/null | grep -q "^$framework $DOTNET_MAJOR\."; then
+            ok ".NET $DOTNET_MAJOR runtime installed from the $OS_NAME repositories"
+            return 0
+        fi
+        info "aspnetcore-runtime-$DOTNET_MAJOR.0 is not in this server's repositories; using Microsoft's installer"
+        pkg_install libicu
+    else
+        # .NET needs ICU; the package name carries the version (libicu70, libicu74, ...)
+        local icu
+        icu=$(apt-cache pkgnames libicu 2>/dev/null | grep -E '^libicu[0-9]+$' | sort -V | tail -1 || true)
+        pkg_install ${icu:+"$icu"} libssl3 2>/dev/null || pkg_install ${icu:+"$icu"}
+    fi
 
     # Into the existing .NET folder when there is one, so other applications keep working
     local root=/usr/share/dotnet
@@ -228,6 +307,11 @@ ensure_dotnet() {
     bash /tmp/dotnet-install.sh --channel "$DOTNET_MAJOR.0" --runtime aspnetcore --install-dir "$root" >/dev/null
     rm -f /tmp/dotnet-install.sh
     [[ -e /usr/bin/dotnet ]] || ln -s "$root/dotnet" /usr/bin/dotnet
+    if selinux_enabled; then
+        # systemd may only start programs labelled as executables
+        selinux_label bin_t "$root/dotnet"
+        restorecon "$root/dotnet"
+    fi
 
     dotnet --list-runtimes 2>/dev/null | grep -q "^$framework $DOTNET_MAJOR\." || fail ".NET $DOTNET_MAJOR could not be installed."
     ok ".NET $DOTNET_MAJOR runtime installed in $root"
@@ -238,33 +322,60 @@ ensure_web_server() {
     [[ "$KIT_TYPE" == "Api" && -z "$SITE_HOST" ]] && return 0
 
     if [[ "$WEB_SERVER" == "nginx" ]]; then
-        apt_install nginx
+        pkg_install nginx
         systemctl enable --now nginx >/dev/null 2>&1
         ok "Nginx is installed and running"
-    else
-        apt_install apache2
+    elif [[ "$OS_FAMILY" == debian ]]; then
+        pkg_install apache2
         a2enmod proxy proxy_http proxy_wstunnel headers rewrite ssl >/dev/null
         systemctl enable --now apache2 >/dev/null 2>&1
         ok "Apache is installed and running"
+    else
+        # httpd loads the proxy, headers and rewrite modules by default; mod_ssl adds HTTPS
+        pkg_install httpd
+        [[ -n "$CERT_PATH" ]] && pkg_install mod_ssl
+        systemctl enable --now httpd >/dev/null 2>&1
+        ok "Apache (httpd) is installed and running"
     fi
 
-    # Open HTTP/HTTPS when the ufw firewall is on
+    # Open HTTP/HTTPS when a firewall is on: ufw (Ubuntu) or firewalld (Red Hat)
     if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
         ufw allow "$([[ "$WEB_SERVER" == "nginx" ]] && echo "Nginx Full" || echo "Apache Full")" >/dev/null
         ok "Firewall (ufw) allows HTTP and HTTPS"
+    elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
+        firewall-cmd --permanent --add-service=http --add-service=https >/dev/null
+        firewall-cmd --reload >/dev/null
+        ok "Firewall (firewalld) allows HTTP and HTTPS"
+    fi
+
+    # SELinux stops the web server from opening connections, so it could not forward to the app without this
+    if selinux_enabled; then
+        setsebool -P httpd_can_network_connect 1
+        ok "SELinux allows $WEB_SERVER to forward requests (httpd_can_network_connect)"
     fi
 }
 
 ensure_redis() {
     [[ "$KIT_TYPE" == "Api" && "$INSTALL_REDIS" == true ]] || return 0
-    apt_install redis-server
-    if ! grep -qE "^port $REDIS_PORT\$" /etc/redis/redis.conf; then
-        sed -i -E "s/^port .*/port $REDIS_PORT/" /etc/redis/redis.conf
-        systemctl restart redis-server
+    local conf cli name=Redis
+    if [[ "$OS_FAMILY" == debian ]]; then
+        pkg_install redis-server
+        REDIS_SERVICE=redis-server; conf=/etc/redis/redis.conf; cli=redis-cli
+    elif pkg_installed redis || { ! pkg_installed valkey && pkg_install redis 2>/dev/null; }; then
+        REDIS_SERVICE=redis; cli=redis-cli
+        conf=/etc/redis/redis.conf; [[ -f "$conf" ]] || conf=/etc/redis.conf
+    else
+        # RHEL 10 ships Valkey (the open-source fork of Redis, same protocol) instead of Redis
+        pkg_install valkey
+        REDIS_SERVICE=valkey; conf=/etc/valkey/valkey.conf; cli=valkey-cli; name=Valkey
     fi
-    systemctl enable --now redis-server >/dev/null 2>&1
-    redis-cli -p "$REDIS_PORT" ping 2>/dev/null | grep -q PONG || fail "Redis is not answering on port $REDIS_PORT."
-    ok "Redis is running on port $REDIS_PORT"
+    if [[ -f "$conf" ]] && ! grep -qE "^port $REDIS_PORT\$" "$conf"; then
+        sed -i -E "s/^port .*/port $REDIS_PORT/" "$conf"
+        systemctl restart "$REDIS_SERVICE"
+    fi
+    systemctl enable --now "$REDIS_SERVICE" >/dev/null 2>&1
+    "$cli" -p "$REDIS_PORT" ping 2>/dev/null | grep -q PONG || fail "$name is not answering on port $REDIS_PORT."
+    ok "$name is running on port $REDIS_PORT"
 }
 
 # ---- Application files ------------------------------------------------------------------------------------------
@@ -327,7 +438,7 @@ review_appsettings() {
 
     warn "$settings still contains placeholder values such as <SQL_PASSWORD>."
     if [[ "$ASSUME_YES" == false ]] && [[ -t 0 ]] && confirm "Edit it now with ${EDITOR:-nano}?"; then
-        command -v "${EDITOR:-nano}" >/dev/null 2>&1 || apt_install nano
+        command -v "${EDITOR:-nano}" >/dev/null 2>&1 || pkg_install nano
         "${EDITOR:-nano}" "$settings"
     fi
     has_placeholders "$settings" && warn "Edit it later with: sudo nano $settings  then: sudo systemctl restart $SERVICE_NAME"
@@ -348,12 +459,29 @@ set_permissions() {
         [[ "$SELF_CONTAINED" == true ]] && chmod 750 "$DEPLOY_PATH/$APP_ENTRY"
         ok "Owner $SERVICE_USER, folders 750, files 640"
     else
-        # Static files: the web server (www-data) only reads them
-        chown -R www-data:www-data "$DEPLOY_PATH"
+        # Static files: the web server only reads them
+        local user
+        user=$(web_user)
+        chown -R "$user:$user" "$DEPLOY_PATH"
         find "$DEPLOY_PATH" -type d -exec chmod 755 {} +
         find "$DEPLOY_PATH" -type f -exec chmod 644 {} +
-        ok "Owner www-data, folders 755, files 644"
+        ok "Owner $user, folders 755, files 644"
     fi
+    set_selinux_labels
+}
+
+# Copied files keep the label of the temporary folder they came from, which the web server may not read and
+# systemd may not start. Label the site as web content and a self-contained app as a program.
+set_selinux_labels() {
+    selinux_enabled || return 0
+    if [[ "$DEPLOY_PATH" != /var/www/* ]]; then
+        selinux_label httpd_sys_content_t "$DEPLOY_PATH(/.*)?"
+    fi
+    if [[ "$KIT_TYPE" == "Api" && "$SELF_CONTAINED" == true ]]; then
+        selinux_label bin_t "$DEPLOY_PATH/$APP_ENTRY"
+    fi
+    restorecon -R "$DEPLOY_PATH"
+    ok "SELinux labels set on $DEPLOY_PATH"
 }
 
 # ---- Database ---------------------------------------------------------------------------------------------------
@@ -407,10 +535,10 @@ install_service() {
     cat > "$unit" <<UNIT
 # Managed by DeployVare: this file is rewritten on every deployment.
 # Put your own settings in an override instead:  sudo systemctl edit $SERVICE_NAME
-# Secrets can go in /etc/default/$SERVICE_NAME as KEY=value lines (read when present).
+# Secrets can go in $DEFAULTS_DIR/$SERVICE_NAME as KEY=value lines (read when present).
 [Unit]
 Description=$APP_NAME API ($SERVICE_NAME)
-After=network-online.target$([[ "$INSTALL_REDIS" == true ]] && echo " redis-server.service")
+After=network-online.target$([[ -n "$REDIS_SERVICE" ]] && echo " $REDIS_SERVICE.service")
 Wants=network-online.target
 
 [Service]
@@ -428,7 +556,7 @@ Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://127.0.0.1:$APP_PORT
 Environment=DOTNET_NOLOGO=1
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
-EnvironmentFile=-/etc/default/$SERVICE_NAME
+EnvironmentFile=-$DEFAULTS_DIR/$SERVICE_NAME
 
 [Install]
 WantedBy=multi-user.target
@@ -515,8 +643,12 @@ NGINX
 }
 
 write_nginx_site() {
-    local available="/etc/nginx/sites-available/$SITE_NAME" enabled="/etc/nginx/sites-enabled/$SITE_NAME"
-    local previous=""
+    # Ubuntu/Debian: sites-available + a link in sites-enabled. Red Hat: one file in conf.d.
+    local available="/etc/nginx/conf.d/$SITE_NAME.conf" enabled="" previous=""
+    if [[ -d /etc/nginx/sites-available && -d /etc/nginx/sites-enabled ]]; then
+        available="/etc/nginx/sites-available/$SITE_NAME"
+        enabled="/etc/nginx/sites-enabled/$SITE_NAME"
+    fi
     [[ -f "$available" ]] && { previous=$(mktemp); cp -a "$available" "$previous"; }
 
     # Shared once for every DeployVare site: WebSocket upgrade header for proxied apps
@@ -559,10 +691,10 @@ NGINX
         echo "}"
     } > "$available"
 
-    ln -sfn "$available" "$enabled"
+    [[ -n "$enabled" ]] && ln -sfn "$available" "$enabled"
     if ! nginx -t >/dev/null 2>&1; then
         nginx -t || true
-        if [[ -n "$previous" ]]; then mv "$previous" "$available"; else rm -f "$available" "$enabled"; fi
+        if [[ -n "$previous" ]]; then mv "$previous" "$available"; relabel "$available"; else rm -f "$available" ${enabled:+"$enabled"}; fi
         fail "The Nginx configuration test failed; the previous site configuration was restored."
     fi
     [[ -n "$previous" ]] && rm -f "$previous"
@@ -570,11 +702,22 @@ NGINX
     ok "Nginx site $SITE_NAME is live for $SITE_HOST"
 }
 
+# " upgrade=websocket" when Apache supports it (2.4.47+). RHEL 8 has 2.4.37: plain proxying still works there,
+# WebSockets through Apache do not.
+apache_ws_option() {
+    local version
+    version=$(apachectl -v 2>/dev/null | sed -nE 's#.*Apache/([0-9]+\.[0-9]+\.[0-9]+).*#\1#p' | head -1 || true)
+    if [[ -n "$version" ]] && printf '%s\n%s\n' 2.4.47 "$version" | sort -V -C; then echo " upgrade=websocket"; fi
+    return 0
+}
+
 apache_body() {
+    local ws
+    ws=$(apache_ws_option)
     if [[ "$KIT_TYPE" == "Api" ]]; then
         cat <<APACHE
     ProxyPreserveHost On
-    ProxyPass        / http://127.0.0.1:$APP_PORT/ upgrade=websocket timeout=300
+    ProxyPass        / http://127.0.0.1:$APP_PORT/$ws timeout=300
     ProxyPassReverse / http://127.0.0.1:$APP_PORT/
     LimitRequestBody 524288000
 APACHE
@@ -596,14 +739,19 @@ APACHE
         local path="${API_PROXY_PATH:-/api}" upstream="${API_PROXY_UPSTREAM%/}"
         cat <<APACHE
     ProxyPreserveHost On
-    ProxyPass        $path/ $upstream$path/ upgrade=websocket timeout=300
+    ProxyPass        $path/ $upstream$path/$ws timeout=300
     ProxyPassReverse $path/ $upstream$path/
 APACHE
     fi
 }
 
 write_apache_site() {
-    local available="/etc/apache2/sites-available/$SITE_NAME.conf" previous=""
+    # Ubuntu/Debian: sites-available, enabled with a2ensite. Red Hat: one file in /etc/httpd/conf.d.
+    local available="/etc/httpd/conf.d/$SITE_NAME.conf" service=httpd previous=""
+    if [[ "$OS_FAMILY" == debian ]]; then
+        available="/etc/apache2/sites-available/$SITE_NAME.conf"
+        service=apache2
+    fi
     [[ -f "$available" ]] && { previous=$(mktemp); cp -a "$available" "$previous"; }
     {
         echo "# Managed by DeployVare: rewritten on every deployment of $SITE_NAME."
@@ -626,14 +774,20 @@ write_apache_site() {
         echo "</VirtualHost>"
     } > "$available"
 
-    a2ensite "$SITE_NAME" >/dev/null
-    if ! apache2ctl configtest >/dev/null 2>&1; then
-        apache2ctl configtest || true
-        if [[ -n "$previous" ]]; then mv "$previous" "$available"; else a2dissite "$SITE_NAME" >/dev/null 2>&1 || true; rm -f "$available"; fi
+    [[ "$OS_FAMILY" == debian ]] && a2ensite "$SITE_NAME" >/dev/null
+    if ! apachectl configtest >/dev/null 2>&1; then
+        apachectl configtest || true
+        if [[ -n "$previous" ]]; then
+            mv "$previous" "$available"
+            relabel "$available"
+        else
+            [[ "$OS_FAMILY" == debian ]] && { a2dissite "$SITE_NAME" >/dev/null 2>&1 || true; }
+            rm -f "$available"
+        fi
         fail "The Apache configuration test failed; the previous site configuration was restored."
     fi
     [[ -n "$previous" ]] && rm -f "$previous"
-    systemctl reload apache2
+    systemctl reload "$service"
     ok "Apache site $SITE_NAME is live for $SITE_HOST"
 }
 

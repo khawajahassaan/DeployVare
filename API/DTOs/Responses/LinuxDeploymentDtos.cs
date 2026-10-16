@@ -34,6 +34,8 @@ public class LinuxConnectionTestDto
     public bool? NginxInstalled { get; set; }
     public bool? ApacheInstalled { get; set; }
     public long? DiskFreeMb { get; set; }
+    /// <summary>Enforcing / Permissive / Disabled on Red Hat family servers; null when SELinux is not present.</summary>
+    public string? SeLinux { get; set; }
 }
 
 public class LinuxDeploymentKitResultDto
