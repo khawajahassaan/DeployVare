@@ -32,6 +32,7 @@ public class ArtifactSourceDto
     public string Repository { get; set; } = string.Empty;
     public string Branch { get; set; } = string.Empty;
     public int? PipelineDefinitionId { get; set; }
+    public int? WindowsPipelineDefinitionId { get; set; }
     public string? ArtifactName { get; set; }
     public string? ArtifactSubfolder { get; set; }
     public bool PreserveWebConfig { get; set; }

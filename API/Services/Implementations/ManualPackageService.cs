@@ -360,7 +360,7 @@ public class ManualPackageService : IManualPackageService
             CollectBaselineBackup(extraFiles);
 
         var build = await _azureDevOpsService.GetEligibleBuildAsync(context.Credentials, request.BuildId,
-            source.Repository, source.Branch, source.PipelineDefinitionId, cancellationToken);
+            source.Repository, source.Branch, source.WindowsPipelineId, cancellationToken);
 
         var artifactName = string.IsNullOrWhiteSpace(request.ArtifactName) ? source.ArtifactName : request.ArtifactName;
         if (string.IsNullOrWhiteSpace(artifactName))

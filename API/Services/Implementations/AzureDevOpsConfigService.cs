@@ -227,12 +227,18 @@ public class AzureDevOpsConfigService : IAzureDevOpsConfigService
                 source.PipelineDefinitionId, source.ArtifactName, cancellationToken);
 
             var artifacts = string.Join(", ", build.Artifacts.Select(a => a.Name));
-            return new AzureDevOpsTestResultDto
+            var message = $"Repository '{source.Repository}' and branch '{source.Branch}' found. "
+                + $"Latest successful build: #{build.BuildNumber} ({build.PipelineName}). Artifacts: {artifacts}.";
+
+            if (source.WindowsPipelineDefinitionId.HasValue)
             {
-                Success = true,
-                Message = $"Repository '{source.Repository}' and branch '{source.Branch}' found. "
-                    + $"Latest successful build: #{build.BuildNumber} ({build.PipelineName}). Artifacts: {artifacts}."
-            };
+                var windowsBuild = await _azureDevOpsService.GetLatestSuccessfulBuildAsync(credentials, source.Repository, source.Branch,
+                    source.WindowsPipelineDefinitionId, source.ArtifactName, cancellationToken);
+                message += $" Windows: #{windowsBuild.BuildNumber} ({windowsBuild.PipelineName}). "
+                    + $"Artifacts: {string.Join(", ", windowsBuild.Artifacts.Select(a => a.Name))}.";
+            }
+
+            return new AzureDevOpsTestResultDto { Success = true, Message = message };
         }
         catch (AzureDevOpsException ex)
         {
@@ -246,8 +252,9 @@ public class AzureDevOpsConfigService : IAzureDevOpsConfigService
         var context = await ResolveDeploymentContextAsync(applicationServerId, environment, cancellationToken);
         var source = context.Source;
 
+        // Deploy App (IIS deploy and manual package) is the only caller, so this is a Windows target.
         var build = await _azureDevOpsService.GetLatestSuccessfulBuildAsync(context.Credentials, source.Repository, source.Branch,
-            source.PipelineDefinitionId, source.ArtifactName, cancellationToken);
+            source.WindowsPipelineId, source.ArtifactName, cancellationToken);
 
         var downloadable = build.Artifacts.Where(a => a.IsDownloadable).ToList();
         var selected = !string.IsNullOrWhiteSpace(source.ArtifactName)
@@ -361,12 +368,15 @@ public class AzureDevOpsConfigService : IAzureDevOpsConfigService
     {
         if (request.PipelineDefinitionId is <= 0)
             throw new AzureDevOpsException(AzureDevOpsErrorCode.InvalidConfiguration, "Pipeline ID must be a positive number.");
+        if (request.WindowsPipelineDefinitionId is <= 0)
+            throw new AzureDevOpsException(AzureDevOpsErrorCode.InvalidConfiguration, "Windows pipeline ID must be a positive number.");
 
         source.Environment = request.Environment;
         source.ServerType = request.ServerType;
         source.Repository = AzureDevOpsCredentials.ValidateName(request.Repository, "Repository");
         source.Branch = AzureDevOpsCredentials.NormalizeBranch(request.Branch);
         source.PipelineDefinitionId = request.PipelineDefinitionId;
+        source.WindowsPipelineDefinitionId = request.WindowsPipelineDefinitionId;
         source.ArtifactName = string.IsNullOrWhiteSpace(request.ArtifactName)
             ? null
             : AzureDevOpsCredentials.ValidateName(request.ArtifactName, "Artifact name");
@@ -424,6 +434,7 @@ public class AzureDevOpsConfigService : IAzureDevOpsConfigService
         Repository = source.Repository,
         Branch = source.Branch,
         PipelineDefinitionId = source.PipelineDefinitionId,
+        WindowsPipelineDefinitionId = source.WindowsPipelineDefinitionId,
         ArtifactName = source.ArtifactName,
         ArtifactSubfolder = source.ArtifactSubfolder,
         PreserveWebConfig = source.PreserveWebConfig,

@@ -722,7 +722,7 @@ public class ApiDeploymentService : IApiDeploymentService
             Begin(DeploymentStages.Build);
             deploymentSteps.Add($"Verifying build {request.BuildId}...");
             var build = await _azureDevOpsService.GetEligibleBuildAsync(artifactContext.Credentials, request.BuildId,
-                source.Repository, source.Branch, source.PipelineDefinitionId, cancellationToken);
+                source.Repository, source.Branch, source.WindowsPipelineId, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(source.ArtifactName)
                 && !source.ArtifactName.Equals(request.ArtifactName, StringComparison.OrdinalIgnoreCase))

@@ -32,6 +32,7 @@ const emptySource = (applicationId = 0): SaveArtifactSourceRequest => ({
   repository: '',
   branch: 'main',
   pipelineDefinitionId: null,
+  windowsPipelineDefinitionId: null,
   artifactName: '',
   artifactSubfolder: '',
   preserveWebConfig: true,
@@ -170,6 +171,7 @@ export default function AzureDevOpsPage() {
       repository: source.repository,
       branch: source.branch,
       pipelineDefinitionId: source.pipelineDefinitionId ?? null,
+      windowsPipelineDefinitionId: source.windowsPipelineDefinitionId ?? null,
       artifactName: source.artifactName ?? '',
       artifactSubfolder: source.artifactSubfolder ?? '',
       preserveWebConfig: source.preserveWebConfig,
@@ -191,6 +193,7 @@ export default function AzureDevOpsPage() {
       artifactName: sourceForm.artifactName?.trim() || null,
       artifactSubfolder: sourceForm.artifactSubfolder?.trim() || null,
       pipelineDefinitionId: sourceForm.pipelineDefinitionId || null,
+      windowsPipelineDefinitionId: sourceForm.windowsPipelineDefinitionId || null,
       keepOnServerPaths: sourceForm.keepOnServerPaths?.trim() || null,
       runDatabaseMigrations: sourceForm.serverType === 'Api' && sourceForm.runDatabaseMigrations,
       sqlScriptsArtifactName: sourceForm.sqlScriptsArtifactName?.trim() || null,
@@ -395,7 +398,8 @@ export default function AzureDevOpsPage() {
                               {source.repository} @ {source.branch}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Pipeline: {source.pipelineDefinitionId ?? 'any'} · Artifact: {source.artifactName || 'auto'} · Folder:{' '}
+                              Pipeline: {source.pipelineDefinitionId ?? 'any'}
+                              {source.windowsPipelineDefinitionId && ` · Windows pipeline: ${source.windowsPipelineDefinitionId}`} · Artifact: {source.artifactName || 'auto'} · Folder:{' '}
                               {source.artifactSubfolder || '(root)'} · web.config: {source.preserveWebConfig ? 'keep server copy' : 'overwrite'}
                               {source.keepOnServerPaths && ` · keeps ${source.keepOnServerPaths.split(';').length} path(s)`}
                               {source.runDatabaseMigrations && ` · DB migrations from '${source.sqlScriptsArtifactName ?? 'sqlscripts'}'`}
@@ -525,6 +529,24 @@ export default function AzureDevOpsPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Recommended when more than one pipeline builds this repository and branch. Found in the pipeline URL (definitionId=…).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sourceWindowsPipeline">Windows Pipeline ID</Label>
+                <Input
+                  id="sourceWindowsPipeline"
+                  type="number"
+                  min="1"
+                  placeholder="Same as Pipeline ID"
+                  value={sourceForm.windowsPipelineDefinitionId ?? ''}
+                  onChange={(e) =>
+                    setSourceForm({ ...sourceForm, windowsPipelineDefinitionId: e.target.value ? Number(e.target.value) : null })
+                  }
+                  disabled={savingSource}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Deploy App (IIS) and manual packages take Windows builds from this pipeline; Linux deployments keep the
+                  Pipeline ID above.
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">

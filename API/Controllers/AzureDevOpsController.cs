@@ -209,7 +209,7 @@ public class AzureDevOpsController : ControllerBase
         {
             var context = await _configService.ResolveDeploymentContextAsync(applicationServerId, environment, HttpContext.RequestAborted);
             var build = await _azureDevOpsService.GetEligibleBuildAsync(context.Credentials, buildId,
-                context.Source.Repository, context.Source.Branch, context.Source.PipelineDefinitionId, HttpContext.RequestAborted);
+                context.Source.Repository, context.Source.Branch, context.Source.WindowsPipelineId, HttpContext.RequestAborted);
             return Ok(build.Artifacts);
         }
         catch (Exception ex)

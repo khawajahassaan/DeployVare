@@ -24,6 +24,9 @@ public class SaveArtifactSourceRequest
 
     public int? PipelineDefinitionId { get; set; }
 
+    /// <summary>Optional pipeline for Windows targets (IIS deploy, manual package); Linux keeps PipelineDefinitionId.</summary>
+    public int? WindowsPipelineDefinitionId { get; set; }
+
     [MaxLength(200)]
     public string? ArtifactName { get; set; }
 

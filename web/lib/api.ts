@@ -565,6 +565,7 @@ export interface ArtifactSource {
   repository: string;
   branch: string;
   pipelineDefinitionId?: number;
+  windowsPipelineDefinitionId?: number | null;
   artifactName?: string;
   artifactSubfolder?: string;
   preserveWebConfig: boolean;
@@ -583,6 +584,7 @@ export interface SaveArtifactSourceRequest {
   repository: string;
   branch: string;
   pipelineDefinitionId?: number | null;
+  windowsPipelineDefinitionId?: number | null;
   artifactName?: string | null;
   artifactSubfolder?: string | null;
   preserveWebConfig: boolean;
