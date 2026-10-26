@@ -1,0 +1,44 @@
+# DeployVare on the AuditVare Docker server: api (.NET) and web (Next.js), by IP and port.
+# The database lives in the AuditVare stack's SQL Server (service "mssql"), reached over its network.
+# Run from /opt/deployvare on the server: docker compose up -d (settings in .env, written by deploy.sh).
+name: deployvare
+
+services:
+  api:
+    build: ./api
+    image: deployvare-api:local
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      DB_PROVIDER: sqlserver
+      DB_CONNECTION_STRING: Server=mssql,1433;Database=${DB_NAME:-DeployVare};User Id=sa;Password=${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env};TrustServerCertificate=True;MultipleActiveResultSets=true
+      CORS_ALLOWED_ORIGINS: ${WEB_URL}
+    ports:
+      - "${API_PORT:-8089}:8080"
+    volumes:
+      - uploads:/app/wwwroot/uploads
+      - backups:/app/wwwroot/backups
+      - logs:/app/logs
+    networks: [default, auditvare]
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    image: deployvare-web:local
+    depends_on: [api]
+    ports:
+      - "${WEB_PORT:-8088}:3000"
+    volumes:
+      # The browser reads the API address from here, so the image works under any address.
+      - ./config.js:/app/public/config.js:ro
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  backups:
+  logs:
+
+networks:
+  auditvare:
+    name: auditvare_default
+    external: true
